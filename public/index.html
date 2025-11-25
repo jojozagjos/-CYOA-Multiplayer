@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>CYOA</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=Orbitron:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Black fade transition overlay -->
+  <div id="fade-overlay" class="fade-overlay"></div>
+  
+  <!-- Settings icon (accessible from any screen) -->
+  <button id="btn-settings" class="settings-icon" aria-label="Settings" title="Settings">⚙️</button>
+
+  <div id="app">
+    <div id="bg-layers">
+      <div class="bg-gradient"></div>
+      <div class="bg-grid"></div>
+      <div id="dynamic-bg" class="dynamic-bg"></div>
+    </div>
+
+    <!-- Top bar removed per user request -->
+
+    <main class="fullscreen">
+      <!-- INTRO SCREEN -->
+      <section id="screen-intro" class="screen screen-center">
+        <div class="intro-container">
+          <div class="intro-creator">Made by Joseph Slade</div>
+          <div class="intro-logo">CYOA</div>
+          <div class="intro-tagline">Choose Your Own Adventure</div>
+        </div>
+      </section>
+
+      <!-- MAIN MENU -->
+      <section id="screen-main-menu" class="screen screen-center hidden">
+        <div class="menu-panel card-glass">
+          <h1 class="title">CYOA</h1>
+          <p class="subtitle">Collaborative tabletop storytelling — host a lobby or join friends.</p>
+
+          <div class="form-row">
+            <input type="text" id="input-name" placeholder="Enter your display name">
+          </div>
+
+          <div class="menu-buttons">
+            <button id="btn-host" class="btn-primary">Host Game</button>
+            <button id="btn-join" class="btn-ghost">Join Game</button>
+          </div>
+
+          <div id="join-panel" class="hidden join-panel">
+            <input type="text" id="input-lobby-code" placeholder="Lobby Code (ABCD)">
+            <button id="btn-join-confirm" class="btn-primary">Join</button>
+          </div>
+
+          <div class="quick-links">
+            <small>Tip: Use a memorable name and share the lobby code with friends.</small>
+          </div>
+
+          <div class="load-campaign-section" style="margin-top:20px;border-top:1px solid rgba(255,255,255,0.04);padding-top:20px">
+            <p class="subtitle" style="margin:0 0 12px">Load Saved Campaign</p>
+            <div style="display:flex;gap:8px;justify-content:center">
+              <input type="text" id="input-campaign-id" placeholder="Campaign ID" style="max-width:220px;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit">
+              <button id="btn-load-campaign" class="btn-ghost">Load</button>
+            </div>
+            <div id="load-status" style="margin-top:8px;font-size:13px;color:var(--muted)"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- THEME VOTE (separate screen) -->
+      <section id="screen-theme-vote" class="screen hidden screen-center">
+        <div class="menu-panel card-glass">
+          <h2 class="title">Choose a Theme</h2>
+          <p class="subtitle">Vote for the story theme or add a new one.</p>
+          <div id="theme-vote-section">
+            <div id="theme-options" class="pill-row"></div>
+            <div style="margin-top:12px;display:flex;gap:8px;justify-content:center;flex-direction:column;align-items:center">
+              <div style="display:flex;gap:8px;justify-content:center;width:100%">
+                <input id="new-theme-input" placeholder="Add a custom theme" style="flex:1;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit">
+                <button id="btn-add-theme" class="btn-primary">Add</button>
+              </div>
+              <input id="new-theme-desc" placeholder="Short description (optional)" style="width:92%;margin-top:8px;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit;font-size:13px">
+            </div>
+              <!-- Back button removed as requested -->
+          </div>
+        </div>
+      </section>
+
+      <!-- LOBBY -->
+      <section id="screen-lobby" class="screen hidden screen-center">
+        <div class="lobby-panel card-glass wide">
+          <div class="lobby-header">
+            <div class="lobby-info">
+              <div class="lbl">Lobby</div>
+              <div id="lbl-lobby-id" class="lobby-id">----</div>
+            </div>
+            <div class="lobby-player">You: <span id="lbl-player-name"></span></div>
+          </div>
+
+          <div class="lobby-body">
+            <div class="players-column">
+              <h3>Players</h3>
+              <ul id="list-players" class="players-list"></ul>
+
+                <!-- Start Game button moved under player list -->
+                <div style="margin-top:12px;display:flex;justify-content:center">
+                  <button id="btn-go-to-game" class="btn-primary hidden">Start Game</button>
+                </div>
+
+                <!-- Character section moved under player list -->
+              <div id="character-section" class="hidden char-box">
+                <h3>Character</h3>
+                <input type="text" id="char-name" placeholder="Character name">
+                <input type="text" id="char-role" placeholder="Role (eg. Scout)">
+                <input type="text" id="char-trait" placeholder="Trait (eg. Reckless)">
+
+                <div class="canvas-area">
+                  <label class="small">Draw your character</label>
+                  <canvas id="char-canvas" width="320" height="200" style="border:1px solid rgba(255,255,255,0.04);border-radius:8px;background:#020610"></canvas>
+                  <div class="canvas-controls">
+                    <input type="color" id="brush-color" value="#4de3d7">
+                    <input type="range" id="brush-size" min="1" max="40" value="3">
+                    <div class="brush-preview" id="brush-preview" title="Brush preview"></div>
+                    <button id="btn-undo" class="btn-ghost">Undo</button>
+                    <button id="btn-redo" class="btn-ghost">Redo</button>
+                    <button id="btn-eraser" class="btn-ghost">Eraser</button>
+                    <button id="btn-clear-canvas" class="btn-ghost">Clear</button>
+                  </div>
+
+                  <!-- canvas preview and gallery removed -->
+                </div>
+
+                <div class="char-actions" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+                  <button id="btn-save-char" class="btn-primary">Use Character</button>
+                  <button id="btn-export-char" class="btn-ghost">Export Character</button>
+                  <button id="btn-import-char" class="btn-ghost">Import Character</button>
+                  <input id="input-import-char" type="file" accept="application/json" style="display:none">
+                </div>
+              </div>
+            </div>
+
+            <div class="controls-column">
+
+              <div id="character-section" class="hidden char-box">
+                <h3>Character</h3>
+                <input type="text" id="char-name" placeholder="Character name">
+                <input type="text" id="char-role" placeholder="Role (eg. Scout)">
+                <input type="text" id="char-trait" placeholder="Trait (eg. Reckless)">
+
+                <div class="canvas-area">
+                  <label class="small">Draw your character</label>
+                  <canvas id="char-canvas" width="320" height="200" style="border:1px solid rgba(255,255,255,0.04);border-radius:8px;background:#020610"></canvas>
+                  <div class="canvas-controls">
+                    <input type="color" id="brush-color" value="#4de3d7">
+                    <input type="range" id="brush-size" min="1" max="40" value="3">
+                    <div class="brush-preview" id="brush-preview" title="Brush preview"></div>
+                    <button id="btn-undo" class="btn-ghost">Undo</button>
+                    <button id="btn-redo" class="btn-ghost">Redo</button>
+                    <button id="btn-eraser" class="btn-ghost">Eraser</button>
+                    <button id="btn-clear-canvas" class="btn-ghost">Clear</button>
+                  </div>
+                  <!-- canvas preview and gallery removed per request -->
+                </div>
+                <div class="char-actions" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+                  <button id="btn-save-char" class="btn-primary">Use Character</button>
+                  <button id="btn-export-char" class="btn-ghost">Export Character</button>
+                  <button id="btn-import-char" class="btn-ghost">Import Character</button>
+                  <input id="input-import-char" type="file" accept="application/json" style="display:none">
+                </div>
+              </div>
+
+              <!-- host-controls removed; Start Game button moved into players column -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- GAME -->
+      <section id="screen-game" class="screen hidden screen-edge">
+        <div class="game-shell">
+          <!-- Current Narration Display (prominent) -->
+          <div id="current-narration" class="current-narration hidden">
+            <div class="narration-label">Current Situation</div>
+            <div id="narration-text" class="narration-text"></div>
+          </div>
+
+          <div class="game-main-grid">
+            <!-- Story Log -->
+            <div class="story-column">
+              <div class="story-header">
+                <h3 id="game-theme-heading">Story Log</h3>
+                <div class="game-actions">
+                  <button id="btn-save-game" class="btn-ghost">💾 Save</button>
+                  <span id="save-status" class="save-status"></span>
+                </div>
+              </div>
+              <!-- Story log removed; messages will animate into the main narration display -->
+
+              <!-- Action Panels (context-dependent) -->
+              <div id="individual-panel" class="action-panel hidden">
+                <div class="panel-header">Your Turn</div>
+                <textarea id="input-action" placeholder="Describe your action..."></textarea>
+                <button id="btn-send-action" class="btn-primary">Take Action</button>
+              </div>
+
+              <div id="group-proposal-panel" class="action-panel hidden">
+                <div class="panel-header">Propose Group Action</div>
+                <input id="input-proposal" placeholder="What should the party do?">
+                <button id="btn-send-proposal" class="btn-primary">Propose</button>
+              </div>
+
+              <div id="group-vote-panel" class="action-panel hidden">
+                <div class="panel-header">Vote on Proposals</div>
+                <div id="proposal-list" class="proposal-list"></div>
+              </div>
+            </div>
+
+            <!-- Party Sidebar -->
+            <aside class="party-sidebar">
+              <h4>Party</h4>
+              <ul id="sidebar-players"></ul>
+              <div class="game-meta">
+                <div id="game-phase-label">Phase: --</div>
+                <div id="campaign-id-label"></div>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Credits / introduction screen shown after voting finishes -->
+    <div id="credits-screen" class="overlay hidden" aria-hidden="true">
+      <div class="credits-card">
+        <div class="credits-media">
+          <img id="credits-img" src="" alt="Character image" />
+        </div>
+        <div class="credits-body">
+          <h2 id="credits-name" class="credits-name-anim">Name</h2>
+          <div id="credits-role" class="credits-meta credits-role-anim">Role</div>
+          <div id="credits-trait" class="credits-meta credits-trait-anim">Trait</div>
+          <p id="credits-desc" class="credits-desc credits-desc-anim"></p>
+        </div>
+      </div>
+    </div>
+
+    <div id="notifications" class="notifications" aria-live="polite" aria-atomic="true"></div>
+
+    <!-- Settings Panel -->
+    <div id="settings-panel" class="settings-panel hidden" aria-hidden="true">
+      <div class="settings-content">
+        <div class="settings-header">
+          <h2>Settings</h2>
+          <button id="btn-close-settings" class="btn-ghost">&times;</button>
+        </div>
+        <div class="settings-body">
+          <div class="setting-group">
+            <label for="volume-master">Master Volume</label>
+            <input type="range" id="volume-master" min="0" max="100" value="70">
+            <span id="volume-master-val" class="volume-val">70%</span>
+          </div>
+          <div class="setting-group">
+            <label for="volume-music">Music Volume</label>
+            <input type="range" id="volume-music" min="0" max="100" value="50">
+            <span id="volume-music-val" class="volume-val">50%</span>
+          </div>
+          <div class="setting-group">
+            <label for="volume-sfx">Sound Effects</label>
+            <input type="range" id="volume-sfx" min="0" max="100" value="60">
+            <span id="volume-sfx-val" class="volume-val">60%</span>
+          </div>
+          <div class="setting-group">
+            <label for="volume-narration">Narration Voice</label>
+            <input type="range" id="volume-narration" min="0" max="100" value="80">
+            <span id="volume-narration-val" class="volume-val">80%</span>
+          </div>
+          <!-- Narration speed setting removed per user request -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="client.js"></script>
+</body>
+</html>
