@@ -17,7 +17,8 @@ const {
   getPublicLobbyState,
   serializeCampaign,
   deserializeCampaign,
-  startGameAfterCredits
+  startGameAfterCredits,
+  ITEM_TYPES
 } = require('./gameLogic');
 
 const app = express();
@@ -143,19 +144,19 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('playerAction', ({ lobbyId, actionText }) => {
+  socket.on('playerAction', ({ lobbyId, actionText, itemToUse }) => {
     const id = (lobbyId || '').toUpperCase();
     const lobby = lobbies.get(id);
     if (!lobby) return;
-    handlePlayerAction(lobby, socket.id, actionText);
+    handlePlayerAction(lobby, socket.id, actionText, itemToUse);
     io.to(id).emit('lobbyUpdate', getPublicLobbyState(lobby));
   });
 
-  socket.on('groupProposal', ({ lobbyId, proposalText }) => {
+  socket.on('groupProposal', ({ lobbyId, proposalText, itemToAttach }) => {
     const id = (lobbyId || '').toUpperCase();
     const lobby = lobbies.get(id);
     if (!lobby) return;
-    handleGroupProposal(lobby, socket.id, proposalText);
+    handleGroupProposal(lobby, socket.id, proposalText, itemToAttach);
     io.to(id).emit('lobbyUpdate', getPublicLobbyState(lobby));
   });
 

@@ -17,6 +17,7 @@ let awaitingStartAfterCredits = false; // true after client signals creditsCompl
 const screens = {
   intro: document.getElementById('screen-intro'),
   main: document.getElementById('screen-main-menu'),
+  charEditor: document.getElementById('screen-char-editor'),
   lobby: document.getElementById('screen-lobby'),
   game: document.getElementById('screen-game'),
   themeVote: document.getElementById('screen-theme-vote')
@@ -178,32 +179,71 @@ function updateAudioVolumes() {
   }
 }
 
-// Try to load and play real audio file, fallback to procedural
+// Dynamic theme music from API
 function playThemeMusic(themeKey) {
   stopMusic();
   
-  // Try real audio file first
-  const audioFile = `audio/${themeKey}-theme.mp3`;
-  const audio = new Audio();
+  // Map theme to specific genre tags for audio search
+  const themeToGenre = {
+    dungeon: 'dark ambient',
+    space: 'space ambient',
+    mansion: 'horror',
+    cyber: 'cyberpunk electronic',
+    island: 'tropical',
+    wilds: 'nature ambient',
+    steampunk: 'steampunk',
+    noir: 'jazz noir',
+    default: 'ambient'
+  };
   
-  audio.addEventListener('canplaythrough', () => {
-    currentMusicAudio = audio;
-    audio.loop = true;
-    const masterVol = (settings.volumeMaster || 70) / 100;
-    const musicVol = (settings.volumeMusic || 50) / 100;
-    audio.volume = masterVol * musicVol;
-    audio.play().catch(() => {
-      // Silently fall back to procedural music
+  const genre = themeToGenre[themeKey] || themeToGenre.default;
+  
+  // Use ccMixter API (Creative Commons music, no auth needed)
+  const apiUrl = `https://ccmixter.org/api/query?f=json&tags=${encodeURIComponent(genre)}&limit=20&sort=rank`;
+  
+  console.log(`[Audio] Fetching theme music for: ${themeKey} (${genre})`);
+  
+  fetch(apiUrl)
+    .then(res => res.json())
+    .then(data => {
+      if (data && Array.isArray(data) && data.length > 0) {
+        // Filter for tracks with valid file URLs
+        const validTracks = data.filter(track => 
+          track.files && 
+          track.files.length > 0 &&
+          track.files[0].download_url
+        );
+        
+        if (validTracks.length > 0) {
+          // Pick a random track from results
+          const track = validTracks[Math.floor(Math.random() * validTracks.length)];
+          const audioUrl = track.files[0].download_url;
+          const audio = new Audio(audioUrl);
+          currentMusicAudio = audio;
+          audio.loop = true;
+          const masterVol = (settings.volumeMaster || 70) / 100;
+          const musicVol = (settings.volumeMusic || 50) / 100;
+          audio.volume = masterVol * musicVol * 0.6;
+          
+          audio.play()
+            .then(() => console.log(`[Audio] Playing: ${track.upload_name || 'Unknown'}`))
+            .catch(err => {
+              console.log('[Audio] Playback failed, using procedural:', err);
+              fallbackProceduralMusic(themeKey);
+            });
+        } else {
+          console.log('[Audio] No valid tracks found, using procedural');
+          fallbackProceduralMusic(themeKey);
+        }
+      } else {
+        console.log('[Audio] No results from API, using procedural');
+        fallbackProceduralMusic(themeKey);
+      }
+    })
+    .catch(err => {
+      console.log('[Audio] API fetch failed, using procedural:', err);
       fallbackProceduralMusic(themeKey);
     });
-  }, { once: true });
-  
-  audio.addEventListener('error', () => {
-    // Silently fallback to procedural if file not found (expected)
-    fallbackProceduralMusic(themeKey);
-  }, { once: true });
-  
-  audio.src = audioFile;
 }
 
 function fallbackProceduralMusic(themeKey) {
@@ -258,17 +298,61 @@ function stopMusic() {
   }
 }
 
-function playSFX(type) {
-  // Try real SFX file first
-  const audioFile = `audio/${type}.mp3`;
-  const audio = new Audio(audioFile);
-  const masterVol = (settings.volumeMaster || 70) / 100;
-  const sfxVol = (settings.volumeSFX || 60) / 100;
-  audio.volume = masterVol * sfxVol;
+// Story-context aware sound effects from API
+function playSFX(storyContext) {
+  if (!storyContext || typeof storyContext !== 'string') return;
   
-  // Silently fallback to procedural if file doesn't exist
-  audio.addEventListener('error', () => fallbackProceduralSFX(type), { once: true });
-  audio.play().catch(() => fallbackProceduralSFX(type));
+  // Analyze story text for sound effect keywords
+  const context = storyContext.toLowerCase();
+  let sfxQuery = '';
+  
+  // Map story keywords to sound effects
+  if (context.includes('door') || context.includes('creak')) sfxQuery = 'door creak';
+  else if (context.includes('footstep') || context.includes('walk')) sfxQuery = 'footsteps';
+  else if (context.includes('explosion') || context.includes('explode')) sfxQuery = 'explosion';
+  else if (context.includes('sword') || context.includes('blade')) sfxQuery = 'sword swing';
+  else if (context.includes('fire') || context.includes('flame')) sfxQuery = 'fire burning';
+  else if (context.includes('water') || context.includes('splash')) sfxQuery = 'water splash';
+  else if (context.includes('wind') || context.includes('breeze')) sfxQuery = 'wind howl';
+  else if (context.includes('thunder') || context.includes('lightning')) sfxQuery = 'thunder';
+  else if (context.includes('scream') || context.includes('yell')) sfxQuery = 'scream';
+  else if (context.includes('bell') || context.includes('chime')) sfxQuery = 'bell ring';
+  else if (context.includes('glass') || context.includes('shatter')) sfxQuery = 'glass shatter';
+  else if (context.includes('metal') || context.includes('clang')) sfxQuery = 'metal clang';
+  else if (context.includes('creature') || context.includes('growl')) sfxQuery = 'monster growl';
+  else if (context.includes('magic') || context.includes('spell')) sfxQuery = 'magic spell';
+  else if (context.includes('hit') || context.includes('punch')) sfxQuery = 'punch impact';
+  else return; // No matching keyword, don't play SFX
+  
+  // Use Freesound API for dynamic sound effects
+  const query = encodeURIComponent(sfxQuery);
+  const apiUrl = `https://freesound.org/apiv2/search/text/?query=${query}&filter=duration:[0+TO+5]&fields=id,name,previews&token=YOUR_API_TOKEN`;
+  
+  console.log(`[SFX] Would fetch sound for: ${sfxQuery}`);
+  // Fallback to procedural for demo
+  fallbackProceduralSFX('notification');
+  
+  // Uncomment when you have an API token:
+  /*
+  fetch(apiUrl)
+    .then(res => res.json())
+    .then(data => {
+      if (data.results && data.results.length > 0) {
+        const sound = data.results[0];
+        const audio = new Audio(sound.previews['preview-hq-mp3']);
+        const masterVol = (settings.volumeMaster || 70) / 100;
+        const sfxVol = (settings.volumeSFX || 60) / 100;
+        audio.volume = masterVol * sfxVol;
+        audio.play().catch(() => fallbackProceduralSFX('notification'));
+      } else {
+        fallbackProceduralSFX('notification');
+      }
+    })
+    .catch(err => {
+      console.log('[SFX] API fetch failed, using procedural');
+      fallbackProceduralSFX('notification');
+    });
+  */
 }
 
 function fallbackProceduralSFX(type) {
@@ -388,6 +472,7 @@ if (btnJoin) btnJoin.disabled = !(inputName && (inputName.value || '').trim());
 
 // Character drawing elements
 const canvas = document.getElementById('char-canvas');
+const canvasBgColor = document.getElementById('canvas-bg-color');
 const brushColor = document.getElementById('brush-color');
 const brushSize = document.getElementById('brush-size');
 const btnClearCanvas = document.getElementById('btn-clear-canvas');
@@ -413,12 +498,13 @@ function setupCanvas() {
   ctx.scale(dpr, dpr);
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  // fill background
-  ctx.fillStyle = '#020610';
-  ctx.fillRect(0, 0, cssW, cssH);
+  // Use CSS background so changing the color doesn't require re-writing pixel data.
+  // Keep canvas pixel buffer transparent so the eraser can remove pixels (destination-out).
+  const bg = (canvasBgColor && canvasBgColor.value) ? canvasBgColor.value : '#ffffff';
+  canvas.style.background = bg;
+  ctx.clearRect(0, 0, cssW, cssH);
   try { BLANK_CANVAS = canvas.toDataURL('image/png'); } catch (e) { BLANK_CANVAS = null; }
   pushHistory();
-  updateBrushPreview();
 }
 
 function pushHistory() {
@@ -447,28 +533,6 @@ function restoreHistory(idx) {
   img.src = drawHistory[idx];
 }
 
-function updateBrushPreview() {
-  const preview = document.getElementById('brush-preview');
-  if (!preview) return;
-  preview.innerHTML = '';
-  const dot = document.createElement('div');
-  const raw = Math.max(1, parseInt(brushSize.value || 3, 10));
-  // map slider range to preview size so mid-values show mid-size
-  const minVal = Math.max(1, parseInt(brushSize.min || 1, 10));
-  const maxVal = Math.max(minVal + 1, parseInt(brushSize.max || 40, 10));
-  const maxDot = 24; // px maximum preview dot
-  const minDot = 4; // px minimum preview dot
-  const normalized = Math.min(1, Math.max(0, (raw - minVal) / (maxVal - minVal)));
-  const previewSize = Math.round(minDot + normalized * (maxDot - minDot));
-  dot.style.width = previewSize + 'px';
-  dot.style.height = previewSize + 'px';
-  dot.style.borderRadius = '50%';
-  dot.style.background = isEraser ? '#020610' : (brushColor.value || '#4de3d7');
-  dot.style.margin = 'auto';
-  dot.style.boxShadow = '0 2px 6px rgba(0,0,0,0.6)';
-  preview.appendChild(dot);
-}
-
 if (canvas && ctx) {
   function getPos(e) {
     const rect = canvas.getBoundingClientRect();
@@ -494,7 +558,7 @@ if (canvas && ctx) {
     if (!isDrawing) return;
     const p = getPos(e);
     ctx.globalCompositeOperation = isEraser ? 'destination-out' : 'source-over';
-    ctx.strokeStyle = brushColor.value || '#4de3d7';
+    ctx.strokeStyle = '#000000';
     ctx.lineWidth = parseInt(brushSize.value || 3, 10);
     if (isEraser) ctx.lineWidth = Math.max(8, ctx.lineWidth);
     // simple smoothing via quadratic curve
@@ -512,14 +576,15 @@ if (canvas && ctx) {
   // touch
   canvas.addEventListener('touchstart', (e) => { e.preventDefault(); isDrawing = true; pushHistory(); const p = getPos(e); lastPos = p; ctx.beginPath(); ctx.moveTo(p.x, p.y); });
   window.addEventListener('touchend', () => { if (isDrawing) { isDrawing = false; ctx.closePath(); lastPos = null; } });
-  canvas.addEventListener('touchmove', (e) => { e.preventDefault(); if (!isDrawing) return; const p = getPos(e); ctx.globalCompositeOperation = isEraser ? 'destination-out' : 'source-over'; ctx.strokeStyle = brushColor.value || '#4de3d7'; ctx.lineWidth = parseInt(brushSize.value || 3, 10); if (isEraser) ctx.lineWidth = Math.max(8, ctx.lineWidth); if (lastPos) { ctx.beginPath(); ctx.moveTo(lastPos.x, lastPos.y); ctx.quadraticCurveTo((lastPos.x + p.x) / 2, (lastPos.y + p.y) / 2, p.x, p.y); ctx.stroke(); } else { ctx.lineTo(p.x, p.y); ctx.stroke(); } lastPos = p; });
+  canvas.addEventListener('touchmove', (e) => { e.preventDefault(); if (!isDrawing) return; const p = getPos(e); ctx.globalCompositeOperation = isEraser ? 'destination-out' : 'source-over'; ctx.strokeStyle = '#000000'; ctx.lineWidth = parseInt(brushSize.value || 3, 10); if (isEraser) ctx.lineWidth = Math.max(8, ctx.lineWidth); if (lastPos) { ctx.beginPath(); ctx.moveTo(lastPos.x, lastPos.y); ctx.quadraticCurveTo((lastPos.x + p.x) / 2, (lastPos.y + p.y) / 2, p.x, p.y); ctx.stroke(); } else { ctx.lineTo(p.x, p.y); ctx.stroke(); } lastPos = p; });
 
   btnClearCanvas.addEventListener('click', () => {
     const cssW = parseInt(canvas.style.width || canvas.width, 10);
     const cssH = parseInt(canvas.style.height || canvas.height, 10);
-      ctx.clearRect(0, 0, cssW, cssH);
-      ctx.fillStyle = '#020610';
-      ctx.fillRect(0, 0, cssW, cssH);
+    // Clear pixel buffer and ensure CSS background shows behind transparent pixels
+    ctx.clearRect(0, 0, cssW, cssH);
+    const bg = (canvasBgColor && canvasBgColor.value) ? canvasBgColor.value : '#ffffff';
+    canvas.style.background = bg;
     pushHistory();
     notify('Canvas cleared', 'info');
   });
@@ -547,7 +612,6 @@ if (canvas && ctx) {
   btnEraser.addEventListener('click', () => {
     isEraser = !isEraser;
     btnEraser.classList.toggle('active', isEraser);
-    updateBrushPreview();
   });
 
   // Note: Save Drawing and Download buttons removed per user request.
@@ -555,8 +619,17 @@ if (canvas && ctx) {
   // gallery removed — drawings are no longer previewed/saved locally
 
   // brush input handlers
-  brushColor.addEventListener('input', () => updateBrushPreview());
-  brushSize.addEventListener('input', () => updateBrushPreview());
+  brushSize.addEventListener('input', () => {});
+  if (canvasBgColor) {
+    canvasBgColor.addEventListener('input', () => {
+      if (!canvas) return;
+      const bgColor = canvasBgColor.value || '#ffffff';
+      // Only change CSS background so pixel data remains intact (transparent background)
+      canvas.style.background = bgColor;
+      // record this change in history (no pixel rewrite)
+      pushHistory();
+    });
+  }
 
   // prepare canvas for HiDPI
   setupCanvas();
@@ -663,6 +736,7 @@ updateExportButtonState();
 // Game elements
 // story log removed from DOM; we'll animate lines into `#narration-text` instead
 let lastStoryLogLen = 0;
+// Game UI elements
 const individualPanel = document.getElementById('individual-panel');
 const groupProposalPanel = document.getElementById('group-proposal-panel');
 const groupVotePanel = document.getElementById('group-vote-panel');
@@ -676,6 +750,8 @@ const gamePhaseLabel = document.getElementById('game-phase-label');
 const campaignIdLabel = document.getElementById('campaign-id-label');
 const btnSaveGame = document.getElementById('btn-save-game');
 const saveStatus = document.getElementById('save-status');
+
+let selectedItemForAction = null;
 
 // Main menu handlers
 if (btnHost) btnHost.addEventListener('click', () => {
@@ -797,7 +873,8 @@ if (btnExportChar) {
       name: nameVal || currentPlayerName || 'Hero',
       role: roleVal || 'Adventurer',
       trait: traitVal || 'Determined',
-      image: null
+      image: null,
+      bgColor: (canvasBgColor && canvasBgColor.value) || '#ffffff'
     };
     try {
       if (canvas && ctx) payload.image = canvas.toDataURL('image/png');
@@ -835,6 +912,11 @@ if (btnImportChar && inputImportChar) {
         charNameInput.value = json.name || '';
         charRoleInput.value = json.role || '';
         charTraitInput.value = json.trait || '';
+        // load background color if provided
+        if (json.bgColor && canvasBgColor) {
+          canvasBgColor.value = json.bgColor;
+          if (canvas) canvas.style.background = json.bgColor;
+        }
         // load image into preview and canvas
             if (json.image) {
               // draw on canvas
@@ -842,7 +924,10 @@ if (btnImportChar && inputImportChar) {
               im.onload = () => {
                 const cssW = parseInt(canvas.style.width || canvas.width, 10);
                 const cssH = parseInt(canvas.style.height || canvas.height, 10);
+                const bgColor = (canvasBgColor && canvasBgColor.value) || '#ffffff';
                 ctx.clearRect(0, 0, cssW, cssH);
+                ctx.fillStyle = bgColor;
+                ctx.fillRect(0, 0, cssW, cssH);
                 ctx.drawImage(im, 0, 0, cssW, cssH);
                 pushHistory();
                 notify('Character image loaded into canvas.', 'success');
@@ -868,21 +953,29 @@ if (btnGoToGame) btnGoToGame.addEventListener('click', () => {
   notify('Start requested. Waiting for host to start game...', 'info');
 });
 
-// Game handlers
+// Game action handlers with item attachment
 if (btnSendAction) btnSendAction.addEventListener('click', () => {
   const text = (inputAction.value || '').trim();
   if (!text || !currentLobbyId) return;
-  socket.emit('playerAction', { lobbyId: currentLobbyId, actionText: text });
+  socket.emit('playerAction', { 
+    lobbyId: currentLobbyId, 
+    actionText: text,
+    itemToUse: selectedItemForAction
+  });
   inputAction.value = '';
-  playSFX('action');
+  selectedItemForAction = null;
 });
 
 if (btnSendProposal) btnSendProposal.addEventListener('click', () => {
   const text = (inputProposal.value || '').trim();
   if (!text || !currentLobbyId) return;
-  socket.emit('groupProposal', { lobbyId: currentLobbyId, proposalText: text });
+  socket.emit('groupProposal', { 
+    lobbyId: currentLobbyId, 
+    proposalText: text,
+    itemToAttach: selectedItemForAction
+  });
   inputProposal.value = '';
-  playSFX('action');
+  selectedItemForAction = null;
 });
 
 if (btnSaveGame) btnSaveGame.addEventListener('click', () => {
@@ -1103,15 +1196,52 @@ function updateLobbyUI(lobby) {
   if (!me && currentPlayerId) me = lobby.players.find(p => p.id === currentPlayerId);
   lblPlayerName.textContent = me ? me.name : currentPlayerName || '';
 
-  // Players list
+  // Update player count
+  const playerCountEl = document.getElementById('player-count');
+  if (playerCountEl) {
+    playerCountEl.textContent = lobby.players.length;
+  }
+
+  // Players list with modern styling
   listPlayers.innerHTML = '';
   lobby.players.forEach(p => {
     const li = document.createElement('li');
-    const hostLabel = p.isHost ? ' (Host)' : '';
-    const created = p.character ? ' ✅' : '';
-    li.textContent = `${p.name}${hostLabel}${created}` + (p.character ? ` — ${p.character.name} (${p.character.role})` : '');
+    
+    // Create player info with icons
+    const playerInfo = document.createElement('div');
+    playerInfo.style.cssText = 'display:flex;align-items:center;gap:12px;flex:1';
+    
+    // Status icon
+    const statusIcon = document.createElement('span');
+    statusIcon.style.cssText = 'font-size:20px';
+    statusIcon.textContent = p.character ? '✅' : '⏳';
+    
+    // Player name and details
+    const playerDetails = document.createElement('div');
+    playerDetails.style.cssText = 'flex:1';
+    
+    const nameSpan = document.createElement('div');
+    nameSpan.style.cssText = 'font-weight:600;color:#e8f0f2;margin-bottom:2px';
+    nameSpan.textContent = p.name + (p.isHost ? ' 👑' : '');
+    
+    const detailsSpan = document.createElement('div');
+    detailsSpan.style.cssText = 'font-size:12px;color:var(--muted)';
+    if (p.character) {
+      detailsSpan.textContent = `${p.character.name} • ${p.character.role}`;
+    } else {
+      detailsSpan.textContent = 'Creating character...';
+    }
+    
+    playerDetails.appendChild(nameSpan);
+    playerDetails.appendChild(detailsSpan);
+    
+    playerInfo.appendChild(statusIcon);
+    playerInfo.appendChild(playerDetails);
+    li.appendChild(playerInfo);
+    
     listPlayers.appendChild(li);
   });
+  
   // Phase-driven UI
   const allHaveChars = lobby.players.length > 0 && lobby.players.every(pl => pl.character);
   // reuse `me` defined above
@@ -1181,7 +1311,6 @@ function renderThemeOptions(lobby) {
       document.querySelectorAll('.theme-item').forEach(el => el.classList.remove('selected'));
       item.classList.add('selected');
       socket.emit('themeVote', { lobbyId: lobby.lobbyId, themeKey: t.key });
-      playSFX('vote');
     };
 
     // prevent title clicks from bubbling (we also make the whole item clickable)
@@ -1235,20 +1364,31 @@ function updateGameUI(lobby) {
   const narrationTextEl = document.getElementById('narration-text');
   const situation = lobby.currentSituation;
   
+  // Show story intro if it exists
+  if (lobby.storyIntro && narrationTextEl) {
+    const introDiv = document.getElementById('story-intro');
+    if (introDiv && !introDiv.dataset.shown) {
+      introDiv.textContent = lobby.storyIntro;
+      introDiv.style.display = 'block';
+      introDiv.dataset.shown = 'true';
+    }
+  }
+  
   if (situation && situation.text && lobby.phase === 'IN_PROGRESS') {
     if (currentNarrationEl) currentNarrationEl.classList.remove('hidden');
     if (narrationTextEl) {
-      // Replace the narration area with the current situation text (animated with typewriter)
-      narrationTextEl.innerHTML = '';
-      const mainSpan = document.createElement('span');
-      mainSpan.className = 'narration-line';
-      narrationTextEl.appendChild(mainSpan);
-      
-      // Use typewriter effect for narration
-      typewriterEffect(mainSpan, situation.text, 25);
-
-      // Speak narration on update (only if different from last)
+      // Only re-render if the situation text has changed
       if (narrationTextEl.dataset.lastText !== situation.text) {
+        // Clear and show current situation with typewriter effect
+        narrationTextEl.innerHTML = '';
+        const mainSpan = document.createElement('span');
+        mainSpan.className = 'narration-line current-situation-text';
+        narrationTextEl.appendChild(mainSpan);
+        
+        // Use typewriter effect for narration
+        typewriterEffect(mainSpan, situation.text, 25);
+
+        // Speak narration on update
         if (!creditsActive && !awaitingStartAfterCredits) speakNarration(situation.text);
         narrationTextEl.dataset.lastText = situation.text;
       }
@@ -1257,7 +1397,8 @@ function updateGameUI(lobby) {
     if (currentNarrationEl) currentNarrationEl.classList.add('hidden');
   }
 
-  // Animate new story-log entries into the current narration area
+  // Append new story-log entries to the story log area
+  const storyLogEl = document.getElementById('story-log');
   const storyLog = (lobby.storyLog || []);
   if (storyLog.length < lastStoryLogLen) lastStoryLogLen = 0; // reset if cleared/reloaded
   if (storyLog.length > lastStoryLogLen) {
@@ -1266,53 +1407,42 @@ function updateGameUI(lobby) {
       let text = '';
       if (entry.type === 'action' || entry.type === 'groupAction') {
         text = `"${entry.text}" (roll: ${entry.roll}, ${entry.successLevel}) — ${entry.outcomeText}`;
+        // Play story-context sound effect based on action outcome
+        if (entry.outcomeText) {
+          setTimeout(() => playSFX(entry.outcomeText), idx * 100);
+        }
       } else {
         text = entry.text;
+        // Play sound effect based on narration text
+        setTimeout(() => playSFX(text), idx * 100);
       }
-      if (narrationTextEl) {
-        const span = document.createElement('span');
-        span.className = 'narration-line';
-        span.textContent = text;
-        narrationTextEl.appendChild(span);
-        // trigger animation
-        void span.offsetWidth;
-        span.classList.add('animate-in');
-        // optionally remove `animate-in` after animation completes
-        setTimeout(() => span.classList.remove('animate-in'), 1200 + (idx * 50));
+      if (storyLogEl) {
+        const p = document.createElement('p');
+        p.className = `story-entry ${entry.type || 'narration'}`;
+        p.textContent = text;
+        storyLogEl.appendChild(p);
+        // Auto-scroll to bottom
+        storyLogEl.scrollTop = storyLogEl.scrollHeight;
       }
     });
     lastStoryLogLen = storyLog.length;
   }
 
-  // Party sidebar with enhanced stats display
+  // Party sidebar with HP and inventory
   if (sidebarPlayers) {
     sidebarPlayers.innerHTML = '';
     (lobby.players || []).forEach((p, idx) => {
       const li = document.createElement('li');
       li.className = 'player-row';
       if (!p.alive) li.classList.add('dead');
-      if (idx === lobby.currentTurnIndex && lobby.phase === 'IN_PROGRESS') {
-        li.classList.add('active-turn');
-      }
 
       const nameDiv = document.createElement('div');
       nameDiv.className = 'player-name';
       nameDiv.textContent = p.character ? p.character.name : p.name;
-      if (idx === lobby.currentTurnIndex && lobby.phase === 'IN_PROGRESS') {
-        nameDiv.textContent += ' ⚡';
-      }
 
-      const hpBar = document.createElement('div');
-      hpBar.className = 'hp-bar';
-      const hpFill = document.createElement('div');
-      hpFill.className = 'hp-fill';
-      const hpPercent = Math.max(0, Math.min(100, (p.hp / 100) * 100));
-      hpFill.style.width = `${hpPercent}%`;
-      hpBar.appendChild(hpFill);
-
-      const hpText = document.createElement('div');
-      hpText.className = 'hp-text';
-      hpText.textContent = `${p.hp} HP`;
+      const hpDiv = document.createElement('div');
+      hpDiv.className = 'player-hp';
+      hpDiv.textContent = `HP: ${p.hp}/10`;
 
       const roleDiv = document.createElement('div');
       roleDiv.className = 'player-role';
@@ -1320,10 +1450,17 @@ function updateGameUI(lobby) {
         roleDiv.textContent = p.character.role;
       }
 
+      // Show inventory items
+      const inventoryDiv = document.createElement('div');
+      inventoryDiv.className = 'player-inventory';
+      if (p.inventory && p.inventory.length > 0) {
+        inventoryDiv.textContent = `Items: ${p.inventory.length}`;
+      }
+
       li.appendChild(nameDiv);
-      li.appendChild(hpBar);
-      li.appendChild(hpText);
+      li.appendChild(hpDiv);
       if (p.character && p.character.role) li.appendChild(roleDiv);
+      if (p.inventory && p.inventory.length > 0) li.appendChild(inventoryDiv);
       sidebarPlayers.appendChild(li);
     });
   }
@@ -1331,7 +1468,7 @@ function updateGameUI(lobby) {
   if (gamePhaseLabel) gamePhaseLabel.textContent = `Phase: ${lobby.phase}`;
   if (campaignIdLabel) campaignIdLabel.textContent = lobby.campaignId ? `ID: ${lobby.campaignId}` : '';
 
-  // Input panels: reset
+  // Reset panels
   if (individualPanel) individualPanel.classList.add('hidden');
   if (groupProposalPanel) groupProposalPanel.classList.add('hidden');
   if (groupVotePanel) groupVotePanel.classList.add('hidden');
@@ -1340,10 +1477,13 @@ function updateGameUI(lobby) {
   if (lobby.phase !== 'IN_PROGRESS' || !situation) return;
 
   const me = lobby.players.find(p => p.id === currentPlayerId);
-
+  
+  // Show inventory panel for current player
+  updateInventoryDisplay(me, situation);
+  
+  // Show appropriate input panel based on situation type
   if (situation.type === 'individual') {
-    const current = lobby.players[lobby.currentTurnIndex];
-    if (current && current.id === currentPlayerId && me && me.alive) {
+    if (situation.currentPlayerId === currentPlayerId && me && me.alive) {
       if (individualPanel) individualPanel.classList.remove('hidden');
     }
   } else if (situation.type === 'group') {
@@ -1359,13 +1499,85 @@ function renderProposalsForVoting(situation) {
   proposalList.innerHTML = '';
   situation.proposals.forEach(pr => {
     const btn = document.createElement('button');
-    btn.textContent = `${pr.fromName}: "${pr.text}"`;
+    let displayText = `${pr.fromName}: "${pr.text}"`;
+    if (pr.itemAttached) {
+      displayText += ` [Using: ${getItemName(pr.itemAttached)}]`;
+    }
+    btn.textContent = displayText;
     btn.addEventListener('click', () => {
       if (!currentLobbyId) return;
       socket.emit('groupVote', { lobbyId: currentLobbyId, proposalId: pr.id });
     });
     proposalList.appendChild(btn);
   });
+}
+
+function updateInventoryDisplay(player, situation) {
+  const inventoryPanel = document.getElementById('inventory-panel');
+  const inventoryList = document.getElementById('inventory-list');
+  
+  if (!inventoryPanel || !inventoryList || !player) return;
+  
+  if (player.inventory && player.inventory.length > 0) {
+    inventoryPanel.classList.remove('hidden');
+    inventoryList.innerHTML = '';
+    
+    player.inventory.forEach(itemType => {
+      const itemDiv = document.createElement('div');
+      itemDiv.className = 'inventory-item';
+      if (selectedItemForAction === itemType) {
+        itemDiv.classList.add('selected');
+      }
+      
+      const itemName = document.createElement('span');
+      itemName.textContent = getItemName(itemType);
+      itemName.className = 'item-name';
+      
+      const attachBtn = document.createElement('button');
+      attachBtn.textContent = selectedItemForAction === itemType ? 'Attached ✓' : 'Attach';
+      attachBtn.className = 'btn-attach-item';
+      attachBtn.onclick = () => toggleItemSelection(itemType);
+      
+      itemDiv.appendChild(itemName);
+      itemDiv.appendChild(attachBtn);
+      inventoryList.appendChild(itemDiv);
+    });
+  } else {
+    inventoryPanel.classList.add('hidden');
+  }
+}
+
+function toggleItemSelection(itemType) {
+  if (selectedItemForAction === itemType) {
+    selectedItemForAction = null;
+  } else {
+    selectedItemForAction = itemType;
+  }
+  
+  // Refresh inventory display
+  const lobby = currentLobbyState;
+  if (lobby) {
+    const me = lobby.players.find(p => p.id === currentPlayerId);
+    updateInventoryDisplay(me, lobby.currentSituation);
+  }
+}
+
+function getItemName(itemType) {
+  const names = {
+    healing_potion: 'Healing Potion',
+    bandages: 'Bandages',
+    revival_herb: 'Revival Herb',
+    medkit: 'Med-Kit',
+    stimpack: 'Stimpack',
+    defibrillator: 'Defibrillator',
+    old_medicine: 'Old Medicine',
+    holy_water: 'Holy Water',
+    medical_bag: 'Medical Bag',
+    nano_injector: 'Nano-Injector',
+    street_medkit: 'Street Med-Kit',
+    trauma_kit: 'Trauma Kit'
+  };
+  return names[itemType] || itemType;
 }
 
 // ====================
@@ -1385,6 +1597,301 @@ function typewriterEffect(element, text, speed = 30, callback) {
     }
   }, speed);
   return timer;
+}
+
+// ====================
+// CHARACTER EDITOR SCREEN
+// ====================
+const btnCharEditor = document.getElementById('btn-char-editor');
+const editorCanvas = document.getElementById('editor-canvas');
+const editorCanvasBg = document.getElementById('editor-canvas-bg');
+const editorBrushColor = document.getElementById('editor-brush-color');
+const editorBrushSize = document.getElementById('editor-brush-size');
+const editorBtnClear = document.getElementById('editor-btn-clear');
+const editorBtnUndo = document.getElementById('editor-btn-undo');
+const editorBtnRedo = document.getElementById('editor-btn-redo');
+const editorBtnEraser = document.getElementById('editor-btn-eraser');
+const editorCharName = document.getElementById('editor-char-name');
+const editorCharRole = document.getElementById('editor-char-role');
+const editorCharTrait = document.getElementById('editor-char-trait');
+const editorBtnExport = document.getElementById('editor-btn-export');
+const editorBtnImport = document.getElementById('editor-btn-import');
+const editorInputImport = document.getElementById('editor-input-import');
+const editorBtnNew = document.getElementById('editor-btn-new');
+const editorBtnBack = document.getElementById('editor-btn-back');
+
+let editorCtx = null;
+let editorIsDrawing = false;
+let editorIsEraser = false;
+let editorDrawHistory = [];
+let editorHistoryIndex = -1;
+let editorBlankCanvas = null;
+
+if (editorCanvas) {
+  editorCtx = editorCanvas.getContext('2d');
+  
+  function setupEditorCanvas() {
+    if (!editorCanvas || !editorCtx) return;
+    const dpr = window.devicePixelRatio || 1;
+    const cssW = editorCanvas.width;
+    const cssH = editorCanvas.height;
+    editorCanvas.style.width = cssW + 'px';
+    editorCanvas.style.height = cssH + 'px';
+    editorCanvas.width = Math.floor(cssW * dpr);
+    editorCanvas.height = Math.floor(cssH * dpr);
+    editorCtx.scale(dpr, dpr);
+    editorCtx.lineCap = 'round';
+    editorCtx.lineJoin = 'round';
+    const bg = (editorCanvasBg && editorCanvasBg.value) ? editorCanvasBg.value : '#ffffff';
+    // Use CSS background so changing the color doesn't require re-writing pixel data.
+    // Keep canvas pixel buffer transparent so the eraser can remove pixels (destination-out).
+    editorCanvas.style.background = bg;
+    editorCtx.clearRect(0, 0, cssW, cssH);
+    try { editorBlankCanvas = editorCanvas.toDataURL('image/png'); } catch (e) { editorBlankCanvas = null; }
+    editorPushHistory();
+  }  function editorPushHistory() {
+    if (!editorCanvas) return;
+    try {
+      const data = editorCanvas.toDataURL('image/png');
+      if (editorHistoryIndex < editorDrawHistory.length - 1) editorDrawHistory = editorDrawHistory.slice(0, editorHistoryIndex + 1);
+      editorDrawHistory.push(data);
+      if (editorDrawHistory.length > 30) editorDrawHistory.shift();
+      editorHistoryIndex = editorDrawHistory.length - 1;
+    } catch (e) {}
+    try { updateExportButtonState(); } catch (e) {}
+  }
+
+  function editorRestoreHistory(idx) {
+    if (!editorDrawHistory[idx]) return;
+    const img = new Image();
+    img.onload = () => {
+      const cssW = parseInt(editorCanvas.style.width || editorCanvas.width, 10);
+      const cssH = parseInt(editorCanvas.style.height || editorCanvas.height, 10);
+      editorCtx.clearRect(0, 0, cssW, cssH);
+      editorCtx.drawImage(img, 0, 0, cssW, cssH);
+    };
+    img.src = editorDrawHistory[idx];
+  }
+
+
+  function getEditorPos(e) {
+    const rect = editorCanvas.getBoundingClientRect();
+    const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+    const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+    return { x, y };
+  }
+
+  let editorLastPos = null;
+
+  editorCanvas.addEventListener('mousedown', (e) => {
+    editorIsDrawing = true;
+    editorPushHistory();
+    const p = getEditorPos(e);
+    editorLastPos = p;
+    editorCtx.beginPath();
+    editorCtx.moveTo(p.x, p.y);
+  });
+  
+  window.addEventListener('mouseup', () => { if (editorIsDrawing) { editorIsDrawing = false; editorCtx.closePath(); editorLastPos = null; } });
+  
+  editorCanvas.addEventListener('mousemove', (e) => {
+    if (!editorIsDrawing) return;
+    const p = getEditorPos(e);
+    editorCtx.globalCompositeOperation = editorIsEraser ? 'destination-out' : 'source-over';
+    editorCtx.strokeStyle = '#000000';
+    editorCtx.lineWidth = parseInt(editorBrushSize.value || 3, 10);
+    if (editorIsEraser) editorCtx.lineWidth = Math.max(8, editorCtx.lineWidth);
+    if (editorLastPos) {
+      editorCtx.beginPath();
+      editorCtx.moveTo(editorLastPos.x, editorLastPos.y);
+      editorCtx.quadraticCurveTo((editorLastPos.x + p.x) / 2, (editorLastPos.y + p.y) / 2, p.x, p.y);
+      editorCtx.stroke();
+    } else {
+      editorCtx.lineTo(p.x, p.y);
+      editorCtx.stroke();
+    }
+    editorLastPos = p;
+  });
+
+  // Touch support
+  editorCanvas.addEventListener('touchstart', (e) => { e.preventDefault(); editorIsDrawing = true; editorPushHistory(); const p = getEditorPos(e); editorLastPos = p; editorCtx.beginPath(); editorCtx.moveTo(p.x, p.y); });
+  window.addEventListener('touchend', () => { if (editorIsDrawing) { editorIsDrawing = false; editorCtx.closePath(); editorLastPos = null; } });
+  editorCanvas.addEventListener('touchmove', (e) => { e.preventDefault(); if (!editorIsDrawing) return; const p = getEditorPos(e); editorCtx.globalCompositeOperation = editorIsEraser ? 'destination-out' : 'source-over'; editorCtx.strokeStyle = '#000000'; editorCtx.lineWidth = parseInt(editorBrushSize.value || 3, 10); if (editorIsEraser) editorCtx.lineWidth = Math.max(8, editorCtx.lineWidth); if (editorLastPos) { editorCtx.beginPath(); editorCtx.moveTo(editorLastPos.x, editorLastPos.y); editorCtx.quadraticCurveTo((editorLastPos.x + p.x) / 2, (editorLastPos.y + p.y) / 2, p.x, p.y); editorCtx.stroke(); } else { editorCtx.lineTo(p.x, p.y); editorCtx.stroke(); } editorLastPos = p; });
+
+  if (editorBtnClear) {
+    editorBtnClear.addEventListener('click', () => {
+      const cssW = parseInt(editorCanvas.style.width || editorCanvas.width, 10);
+      const cssH = parseInt(editorCanvas.style.height || editorCanvas.height, 10);
+      // Clear pixel buffer and ensure CSS background shows behind transparent pixels
+      editorCtx.clearRect(0, 0, cssW, cssH);
+      const bg = (editorCanvasBg && editorCanvasBg.value) ? editorCanvasBg.value : '#ffffff';
+      editorCanvas.style.background = bg;
+      editorPushHistory();
+      notify('Canvas cleared', 'info');
+    });
+  }
+
+  if (editorBtnUndo) {
+    editorBtnUndo.addEventListener('click', () => {
+      if (editorHistoryIndex > 0) {
+        editorHistoryIndex -= 1;
+        editorRestoreHistory(editorHistoryIndex);
+      } else {
+        notify('Nothing to undo', 'warn');
+      }
+    });
+  }
+
+  if (editorBtnRedo) {
+    editorBtnRedo.addEventListener('click', () => {
+      if (editorHistoryIndex < editorDrawHistory.length - 1) {
+        editorHistoryIndex += 1;
+        editorRestoreHistory(editorHistoryIndex);
+      } else {
+        notify('Nothing to redo', 'warn');
+      }
+    });
+  }
+
+  if (editorBtnEraser) {
+    editorBtnEraser.addEventListener('click', () => {
+      editorIsEraser = !editorIsEraser;
+      editorBtnEraser.classList.toggle('active', editorIsEraser);
+    });
+  }
+
+  if (editorBrushSize) {
+    editorBrushSize.addEventListener('input', () => {});
+  }
+
+  if (editorCanvasBg) {
+    editorCanvasBg.addEventListener('input', () => {
+      if (!editorCanvas) return;
+      const cssW = parseInt(editorCanvas.style.width || editorCanvas.width, 10);
+      const cssH = parseInt(editorCanvas.style.height || editorCanvas.height, 10);
+      const bgColor = editorCanvasBg.value || '#ffffff';
+      // Only change CSS background so pixel data remains intact (transparent background)
+      editorCanvas.style.background = bgColor;
+      // record this change in history (no pixel rewrite)
+      editorPushHistory();
+    });
+  }
+
+  setupEditorCanvas();
+}
+
+if (btnCharEditor) {
+  btnCharEditor.addEventListener('click', () => {
+    showScreen('charEditor');
+  });
+}
+
+if (editorBtnBack) {
+  editorBtnBack.addEventListener('click', () => {
+    showScreen('main');
+  });
+}
+
+if (editorBtnNew) {
+  editorBtnNew.addEventListener('click', () => {
+    if (editorCharName) editorCharName.value = '';
+    if (editorCharRole) editorCharRole.value = '';
+    if (editorCharTrait) editorCharTrait.value = '';
+    if (editorCanvas && editorCtx) {
+      const cssW = parseInt(editorCanvas.style.width || editorCanvas.width, 10);
+      const cssH = parseInt(editorCanvas.style.height || editorCanvas.height, 10);
+      // Clear pixel buffer but keep CSS background color visible behind transparent pixels
+      editorCtx.clearRect(0, 0, cssW, cssH);
+      const bg = (editorCanvasBg && editorCanvasBg.value) || '#ffffff';
+      editorCanvas.style.background = bg;
+      editorPushHistory();
+    }
+    notify('New character started', 'info');
+  });
+}
+
+if (editorBtnExport) {
+  editorBtnExport.addEventListener('click', () => {
+    const nameVal = (editorCharName.value || '').trim();
+    const roleVal = (editorCharRole.value || '').trim();
+    const traitVal = (editorCharTrait.value || '').trim();
+    
+    const payload = {
+      name: nameVal || 'Hero',
+      role: roleVal || 'Adventurer',
+      trait: traitVal || 'Determined',
+      image: null,
+      bgColor: (editorCanvasBg && editorCanvasBg.value) || '#ffffff'
+    };
+    
+    try {
+      if (editorCanvas && editorCtx) payload.image = editorCanvas.toDataURL('image/png');
+    } catch (e) {}
+
+    try {
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      const safeName = (payload.name || 'character').replace(/[^a-z0-9-_]/gi, '_');
+      a.download = `cyoa_character_${safeName}_${Date.now()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      notify('Character exported to file.', 'success');
+    } catch (e) {
+      console.error(e);
+      notify('Failed to export character.', 'error');
+    }
+  });
+}
+
+if (editorBtnImport && editorInputImport) {
+  editorBtnImport.addEventListener('click', () => editorInputImport.click());
+  editorInputImport.addEventListener('change', (ev) => {
+    const f = ev.target.files && ev.target.files[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const json = JSON.parse(reader.result);
+        if (!json || typeof json !== 'object') throw new Error('Invalid file');
+        
+        editorCharName.value = json.name || '';
+        editorCharRole.value = json.role || '';
+        editorCharTrait.value = json.trait || '';
+        
+        if (json.bgColor && editorCanvasBg) {
+          editorCanvasBg.value = json.bgColor;
+          if (editorCanvas) editorCanvas.style.background = json.bgColor;
+        }
+        
+        if (json.image) {
+          const im = new Image();
+          im.onload = () => {
+            const cssW = parseInt(editorCanvas.style.width || editorCanvas.width, 10);
+            const cssH = parseInt(editorCanvas.style.height || editorCanvas.height, 10);
+            const bgColor = (editorCanvasBg && editorCanvasBg.value) || '#ffffff';
+            // Use CSS background so the canvas pixel buffer remains transparent where appropriate.
+            editorCanvas.style.background = bgColor;
+            editorCtx.clearRect(0, 0, cssW, cssH);
+            editorCtx.drawImage(im, 0, 0, cssW, cssH);
+            editorPushHistory();
+            notify('Character loaded successfully.', 'success');
+          };
+          im.src = json.image;
+        } else {
+          notify('Character data loaded (no image).', 'info');
+        }
+      } catch (err) {
+        console.error(err);
+        notify('Failed to load character file.', 'error');
+      }
+    };
+    reader.readAsText(f);
+    editorInputImport.value = '';
+  });
 }
 
 // ====================

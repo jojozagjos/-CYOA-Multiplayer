@@ -49,6 +49,10 @@
             <button id="btn-join" class="btn-ghost">Join Game</button>
           </div>
 
+          <div style="margin-top:12px">
+            <button id="btn-char-editor" class="btn-ghost">Character Editor</button>
+          </div>
+
           <div id="join-panel" class="hidden join-panel">
             <input type="text" id="input-lobby-code" placeholder="Lobby Code (ABCD)">
             <button id="btn-join-confirm" class="btn-primary">Join</button>
@@ -88,90 +92,166 @@
         </div>
       </section>
 
-      <!-- LOBBY -->
-      <section id="screen-lobby" class="screen hidden screen-center">
-        <div class="lobby-panel card-glass wide">
-          <div class="lobby-header">
-            <div class="lobby-info">
-              <div class="lbl">Lobby</div>
-              <div id="lbl-lobby-id" class="lobby-id">----</div>
+      <!-- CHARACTER EDITOR SCREEN -->
+      <section id="screen-char-editor" class="screen screen-center hidden">
+        <div class="lobby-container" style="max-width:800px">
+          <div class="lobby-header-card card-glass">
+            <div class="lobby-header-content" style="justify-content:center">
+              <div class="lobby-info-section" style="align-items:center;text-align:center">
+                <div class="lobby-code" style="font-size:32px;letter-spacing:0.1em">Character Editor</div>
+                <div class="lobby-hint">Create, edit, and manage your characters</div>
+              </div>
             </div>
-            <div class="lobby-player">You: <span id="lbl-player-name"></span></div>
           </div>
 
-          <div class="lobby-body">
-            <div class="players-column">
-              <h3>Players</h3>
-              <ul id="list-players" class="players-list"></ul>
-
-                <!-- Start Game button moved under player list -->
-                <div style="margin-top:12px;display:flex;justify-content:center">
-                  <button id="btn-go-to-game" class="btn-primary hidden">Start Game</button>
+          <div class="lobby-section card-glass">
+            <div class="char-form">
+              <div class="form-group">
+                <label class="form-label">Character Name</label>
+                <input type="text" id="editor-char-name" class="form-input" placeholder="Enter character name">
+              </div>
+              
+              <div class="form-row-split">
+                <div class="form-group">
+                  <label class="form-label">Role</label>
+                  <input type="text" id="editor-char-role" class="form-input" placeholder="e.g., Scout">
                 </div>
+                <div class="form-group">
+                  <label class="form-label">Trait</label>
+                  <input type="text" id="editor-char-trait" class="form-input" placeholder="e.g., Reckless">
+                </div>
+              </div>
 
-                <!-- Character section moved under player list -->
-              <div id="character-section" class="hidden char-box">
-                <h3>Character</h3>
-                <input type="text" id="char-name" placeholder="Character name">
-                <input type="text" id="char-role" placeholder="Role (eg. Scout)">
-                <input type="text" id="char-trait" placeholder="Trait (eg. Reckless)">
-
-                <div class="canvas-area">
-                  <label class="small">Draw your character</label>
-                  <canvas id="char-canvas" width="320" height="200" style="border:1px solid rgba(255,255,255,0.04);border-radius:8px;background:#020610"></canvas>
-                  <div class="canvas-controls">
-                    <input type="color" id="brush-color" value="#4de3d7">
-                    <input type="range" id="brush-size" min="1" max="40" value="3">
-                    <div class="brush-preview" id="brush-preview" title="Brush preview"></div>
-                    <button id="btn-undo" class="btn-ghost">Undo</button>
-                    <button id="btn-redo" class="btn-ghost">Redo</button>
-                    <button id="btn-eraser" class="btn-ghost">Eraser</button>
-                    <button id="btn-clear-canvas" class="btn-ghost">Clear</button>
+              <div class="form-group">
+                <label class="form-label">Draw Your Character</label>
+                <div class="canvas-container" style="max-width:320px;margin:0 auto">
+                  <canvas id="editor-canvas" width="320" height="320"></canvas>
+                </div>
+                
+                <div class="canvas-toolbar">
+                  <div class="toolbar-group">
+                    <label class="color-input-wrapper" title="Background Color">
+                      <span class="color-label">BG</span>
+                      <input type="color" id="editor-canvas-bg" value="#ffffff" class="color-input">
+                    </label>
+                    <input type="range" id="editor-brush-size" min="1" max="40" value="3" class="brush-slider">
                   </div>
-
-                  <!-- canvas preview and gallery removed -->
+                  <div class="toolbar-group">
+                    <button id="editor-btn-undo" class="tool-btn" title="Undo">↶</button>
+                    <button id="editor-btn-redo" class="tool-btn" title="Redo">↷</button>
+                    <button id="editor-btn-eraser" class="tool-btn" title="Eraser">Eraser</button>
+                    <button id="editor-btn-clear" class="tool-btn" title="Clear">🗑️</button>
+                  </div>
                 </div>
+              </div>
 
-                <div class="char-actions" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
-                  <button id="btn-save-char" class="btn-primary">Use Character</button>
-                  <button id="btn-export-char" class="btn-ghost">Export Character</button>
-                  <button id="btn-import-char" class="btn-ghost">Import Character</button>
-                  <input id="input-import-char" type="file" accept="application/json" style="display:none">
+              <div class="char-actions-modern">
+                <div class="char-secondary-actions" style="width:100%;justify-content:space-between">
+                  <button id="editor-btn-new" class="btn-ghost">New Character</button>
+                  <div style="display:flex;gap:8px">
+                    <button id="editor-btn-import" class="btn-ghost">Import</button>
+                    <button id="editor-btn-export" class="btn-primary">Export</button>
+                  </div>
                 </div>
+                <input id="editor-input-import" type="file" accept="application/json" style="display:none">
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top:20px;text-align:center">
+            <button id="editor-btn-back" class="btn-ghost">Back to Menu</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- LOBBY -->
+      <section id="screen-lobby" class="screen hidden screen-center">
+        <div class="lobby-container">
+          <!-- Lobby Header -->
+          <div class="lobby-header-card card-glass">
+            <div class="lobby-header-content">
+              <div class="lobby-info-section">
+                <div class="lobby-label">Lobby Code</div>
+                <div id="lbl-lobby-id" class="lobby-code">----</div>
+                <div class="lobby-hint">Share this code with friends</div>
+              </div>
+              <div class="lobby-player-info">
+                <div class="player-label">You are</div>
+                <div id="lbl-player-name" class="player-name-display">---</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="lobby-main-grid">
+            <!-- Left Column: Players -->
+            <div class="lobby-section card-glass">
+              <div class="section-header">
+                <h3 class="section-title">Players in Lobby</h3>
+                <div class="player-count" id="player-count">0</div>
+              </div>
+              <ul id="list-players" class="players-list-modern"></ul>
+              
+              <!-- Start Game Button -->
+              <div class="lobby-action-area">
+                <button id="btn-go-to-game" class="btn-primary btn-large hidden">Start Game</button>
               </div>
             </div>
 
-            <div class="controls-column">
-
-              <div id="character-section" class="hidden char-box">
-                <h3>Character</h3>
-                <input type="text" id="char-name" placeholder="Character name">
-                <input type="text" id="char-role" placeholder="Role (eg. Scout)">
-                <input type="text" id="char-trait" placeholder="Trait (eg. Reckless)">
-
-                <div class="canvas-area">
-                  <label class="small">Draw your character</label>
-                  <canvas id="char-canvas" width="320" height="200" style="border:1px solid rgba(255,255,255,0.04);border-radius:8px;background:#020610"></canvas>
-                  <div class="canvas-controls">
-                    <input type="color" id="brush-color" value="#4de3d7">
-                    <input type="range" id="brush-size" min="1" max="40" value="3">
-                    <div class="brush-preview" id="brush-preview" title="Brush preview"></div>
-                    <button id="btn-undo" class="btn-ghost">Undo</button>
-                    <button id="btn-redo" class="btn-ghost">Redo</button>
-                    <button id="btn-eraser" class="btn-ghost">Eraser</button>
-                    <button id="btn-clear-canvas" class="btn-ghost">Clear</button>
-                  </div>
-                  <!-- canvas preview and gallery removed per request -->
+            <!-- Right Column: Character Creation -->
+            <div class="lobby-section card-glass" id="character-section">
+              <div class="section-header">
+                <h3 class="section-title">Create Your Character</h3>
+              </div>
+              
+              <div class="char-form">
+                <div class="form-group">
+                  <label class="form-label">Character Name</label>
+                  <input type="text" id="char-name" class="form-input" placeholder="Enter character name">
                 </div>
-                <div class="char-actions" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
-                  <button id="btn-save-char" class="btn-primary">Use Character</button>
-                  <button id="btn-export-char" class="btn-ghost">Export Character</button>
-                  <button id="btn-import-char" class="btn-ghost">Import Character</button>
+                
+                <div class="form-row-split">
+                  <div class="form-group">
+                    <label class="form-label">Role</label>
+                    <input type="text" id="char-role" class="form-input" placeholder="e.g., Scout">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Trait</label>
+                    <input type="text" id="char-trait" class="form-input" placeholder="e.g., Reckless">
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Draw Your Character</label>
+                  <div class="canvas-container" style="max-width:320px;margin:0 auto">
+                    <canvas id="char-canvas" width="320" height="320"></canvas>
+                  </div>
+                  
+                  <div class="canvas-toolbar">
+                    <div class="toolbar-group">
+                      <label class="color-input-wrapper" title="Background Color">
+                        <span class="color-label">BG</span>
+                        <input type="color" id="canvas-bg-color" value="#ffffff" class="color-input">
+                      </label>
+                      <input type="range" id="brush-size" min="1" max="40" value="3" class="brush-slider">
+                    </div>
+                    <div class="toolbar-group">
+                      <button id="btn-undo" class="tool-btn" title="Undo">↶</button>
+                      <button id="btn-redo" class="tool-btn" title="Redo">↷</button>
+                      <button id="btn-eraser" class="tool-btn" title="Eraser">Eraser</button>
+                      <button id="btn-clear-canvas" class="tool-btn" title="Clear">🗑️</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="char-actions-modern">
+                  <button id="btn-save-char" class="btn-primary btn-block">✓ Use This Character</button>
+                  <div class="char-secondary-actions">
+                    <button id="btn-export-char" class="btn-ghost btn-sm">Export</button>
+                    <button id="btn-import-char" class="btn-ghost btn-sm">Import</button>
+                  </div>
                   <input id="input-import-char" type="file" accept="application/json" style="display:none">
                 </div>
               </div>
-
-              <!-- host-controls removed; Start Game button moved into players column -->
             </div>
           </div>
         </div>
@@ -183,6 +263,7 @@
           <!-- Current Narration Display (prominent) -->
           <div id="current-narration" class="current-narration hidden">
             <div class="narration-label">Current Situation</div>
+            <div id="story-intro" class="story-intro" style="display:none;"></div>
             <div id="narration-text" class="narration-text"></div>
           </div>
 
@@ -196,11 +277,18 @@
                   <span id="save-status" class="save-status"></span>
                 </div>
               </div>
-              <!-- Story log removed; messages will animate into the main narration display -->
+              <!-- Story log display -->
+              <div id="story-log" class="story-log"></div>
+
+              <!-- Inventory Panel -->
+              <div id="inventory-panel" class="inventory-panel hidden">
+                <div class="panel-header">Your Inventory (click to attach to action)</div>
+                <div id="inventory-list" class="inventory-list"></div>
+              </div>
 
               <!-- Action Panels (context-dependent) -->
               <div id="individual-panel" class="action-panel hidden">
-                <div class="panel-header">Your Turn</div>
+                <div class="panel-header">Your Turn - What do you do?</div>
                 <textarea id="input-action" placeholder="Describe your action..."></textarea>
                 <button id="btn-send-action" class="btn-primary">Take Action</button>
               </div>
@@ -215,6 +303,7 @@
                 <div class="panel-header">Vote on Proposals</div>
                 <div id="proposal-list" class="proposal-list"></div>
               </div>
+
             </div>
 
             <!-- Party Sidebar -->

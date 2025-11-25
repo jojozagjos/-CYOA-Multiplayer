@@ -6,30 +6,117 @@ const THEMES = {
     name: 'Dark Dungeon',
     intro: 'You awaken in a damp stone chamber deep beneath the earth. Torches flicker on the walls, casting long shadows.',
     motifs: ['echoing footsteps', 'distant dripping water', 'whispers behind the walls', 'rusted iron gates'],
-    foes: ['skeletal guardian', 'shadowy warden', 'crawling horror', 'ancient jailer spirit'],
-    goals: ['find a way out', 'recover a lost relic', 'appease the restless dead', 'seal a cursed door']
+    threats: [
+      { desc: 'a skeletal guardian lunges from the shadows', damage: 3 },
+      { desc: 'poisonous gas seeps from cracks in the walls', damage: 2 },
+      { desc: 'a shadowy warden strikes with its rusty blade', damage: 3 },
+      { desc: 'the floor collapses beneath your feet', damage: 2 },
+      { desc: 'a crawling horror emerges from the darkness', damage: 4 }
+    ],
+    discoveries: [
+      { desc: 'a dusty healing potion on a skeleton', item: 'healing_potion' },
+      { desc: 'ancient bandages in a forgotten chest', item: 'bandages' },
+      { desc: 'a warm safe alcove to rest', heal: 2 },
+      { desc: 'a mysterious glowing herb', item: 'revival_herb' },
+      { desc: 'clean water dripping from the ceiling', heal: 1 }
+    ],
+    neutralEvents: [
+      { desc: 'strange carvings on the wall that seem to tell a story' },
+      { desc: 'a locked door that requires all of you to push together' },
+      { desc: 'an eerie silence fills the corridor' },
+      { desc: 'distant sounds of chains rattling' }
+    ]
   },
   space: {
     name: 'Derelict Space Station',
     intro: 'You come to in a dimly lit control room aboard a damaged space station. Emergency lights pulse red.',
     motifs: ['metal groans in the distance', 'air vents hiss', 'alarms briefly chirp then cut out', 'gravity fluctuates slightly'],
-    foes: ['rogue maintenance drone', 'infected crew member', 'unknown organism in the vents', 'glitching security AI'],
-    goals: ['restore power to the core', 're-establish communications', 'reach the escape pods', 'stop a reactor meltdown']
+    threats: [
+      { desc: 'a rogue maintenance drone fires its laser', damage: 3 },
+      { desc: 'an infected crew member attacks wildly', damage: 3 },
+      { desc: 'toxic gas vents from a broken pipe', damage: 2 },
+      { desc: 'an airlock breach pulls you toward space', damage: 4 },
+      { desc: 'electrical sparks shock you as systems malfunction', damage: 2 }
+    ],
+    discoveries: [
+      { desc: 'a med-kit in an emergency locker', item: 'medkit' },
+      { desc: 'stimpacks in the medical bay', item: 'stimpack' },
+      { desc: 'a functioning cryo-pod for quick healing', heal: 3 },
+      { desc: 'emergency rations with nano-healing', heal: 1 },
+      { desc: 'a portable defibrillator', item: 'defibrillator' }
+    ],
+    neutralEvents: [
+      { desc: 'the gravity stabilizes momentarily' },
+      { desc: 'you find a terminal with partial access to station logs' },
+      { desc: 'a window reveals the vastness of space outside' },
+      { desc: 'emergency lights flicker and change color' }
+    ]
   },
   mansion: {
     name: 'Haunted Mansion',
     intro: 'You stand in the foyer of a crumbling mansion. Dust motes drift through slivers of moonlight.',
     motifs: ['floorboards creak', 'cold drafts slip under doors', 'portraits seem to watch you', 'distant piano keys press themselves'],
-    foes: ['restless spirit', 'possessed doll', 'masked intruder', 'shadow at the top of the stairs'],
-    goals: ['uncover the house\'s secret', 'lay a spirit to rest', 'survive until sunrise', 'escape the locked grounds']
+    threats: [
+      { desc: 'a restless spirit screams and drains your life force', damage: 3 },
+      { desc: 'a possessed doll slashes with a hidden blade', damage: 2 },
+      { desc: 'the floor gives way and you fall into the basement', damage: 3 },
+      { desc: 'a masked intruder attacks from behind a curtain', damage: 4 },
+      { desc: 'supernatural cold freezes you to the bone', damage: 2 }
+    ],
+    discoveries: [
+      { desc: 'old medicine in a dusty cabinet', item: 'old_medicine' },
+      { desc: 'blessed water in the chapel', item: 'holy_water' },
+      { desc: 'a warm fireplace to rest by', heal: 2 },
+      { desc: 'herbal tea in the kitchen', heal: 1 },
+      { desc: 'a medical bag from a previous visitor', item: 'medical_bag' }
+    ],
+    neutralEvents: [
+      { desc: 'a portrait\'s eyes seem to follow your movements' },
+      { desc: 'you discover a hidden passage behind a bookshelf' },
+      { desc: 'moonlight illuminates a cryptic message on the wall' },
+      { desc: 'the piano plays a haunting melody by itself' }
+    ]
   },
   cyber: {
     name: 'Neon City Backstreets',
     intro: 'Rain beats down on glowing alleyways. Neon signs flicker overhead, reflecting in puddles at your feet.',
     motifs: ['drones buzz past', 'holographic ads glitch', 'sirens wail in the distance', 'data streams cascade across building walls'],
-    foes: ['street enforcer', 'rogue android', 'data broker gone bad', 'corporate hunter'],
-    goals: ['deliver a stolen data shard', 'erase your identity file', 'expose a corporate cover-up', 'survive a gang war']
+    threats: [
+      { desc: 'a street enforcer fires their neural disruptor', damage: 3 },
+      { desc: 'a rogue android tackles you into a wall', damage: 3 },
+      { desc: 'you\'re caught in corporate crossfire', damage: 4 },
+      { desc: 'a data jack feedback loop shocks your nervous system', damage: 2 },
+      { desc: 'toxic runoff from a factory burns your skin', damage: 2 }
+    ],
+    discoveries: [
+      { desc: 'nano-heal injectors in a dropped case', item: 'nano_injector' },
+      { desc: 'a street doc\'s emergency kit', item: 'street_medkit' },
+      { desc: 'a safe clinic where you can get treatment', heal: 3 },
+      { desc: 'energy drinks with healing nanobots', heal: 1 },
+      { desc: 'a portable trauma kit', item: 'trauma_kit' }
+    ],
+    neutralEvents: [
+      { desc: 'you find a vantage point overlooking the city' },
+      { desc: 'a friendly AI offers cryptic advice' },
+      { desc: 'the rain intensifies, creating digital interference' },
+      { desc: 'you overhear a conversation about nearby dangers' }
+    ]
   }
+};
+
+const ITEM_TYPES = {
+  healing_potion: { name: 'Healing Potion', heal: 3, targetOther: false },
+  bandages: { name: 'Bandages', heal: 2, targetOther: false },
+  revival_herb: { name: 'Revival Herb', heal: 2, targetOther: true },
+  medkit: { name: 'Med-Kit', heal: 4, targetOther: false },
+  stimpack: { name: 'Stimpack', heal: 2, targetOther: false },
+  defibrillator: { name: 'Defibrillator', heal: 3, targetOther: true },
+  old_medicine: { name: 'Old Medicine', heal: 2, targetOther: false },
+  holy_water: { name: 'Holy Water', heal: 3, targetOther: false },
+  medical_bag: { name: 'Medical Bag', heal: 4, targetOther: true },
+  nano_injector: { name: 'Nano-Injector', heal: 3, targetOther: false },
+  street_medkit: { name: 'Street Med-Kit', heal: 3, targetOther: false },
+  trauma_kit: { name: 'Trauma Kit', heal: 5, targetOther: true }
 };
 
 const MAX_HP = 10;
@@ -39,16 +126,17 @@ function createLobbyState(lobbyId) {
   return {
     lobbyId,
     createdAt: Date.now(),
-    players: [], // { id, name, isHost, character, hp, alive, themeVote, connected }
+    players: [], // { id, name, isHost, character, hp, alive, themeVote, connected, inventory: [] }
     phase: 'CHARACTER_CREATION', // CHARACTER_CREATION, THEME_VOTE, IN_PROGRESS, ENDED
     themeKey: null,
     themeName: null,
     availableThemes: Object.keys(THEMES).map(k => ({ key: k, label: THEMES[k].name, intro: THEMES[k].intro })),
     storyLog: [],
     currentTurnIndex: 0,
-    currentSituation: null, // { type: 'individual'|'group', text, proposals: [], votes: {} ...}
+    currentSituation: null,
     campaignId: `cmp_${lobbyId}_${Date.now()}`,
-    turnCount: 0
+    turnCount: 0,
+    storyIntro: null
   };
 }
 
@@ -63,12 +151,14 @@ function joinLobbyState(lobby, playerId, playerName, isHost) {
       hp: MAX_HP,
       alive: true,
       themeVote: null,
-      connected: true
+      connected: true,
+      inventory: []
     };
     lobby.players.push(existing);
   } else {
     existing.connected = true;
     if (playerName) existing.name = playerName;
+    if (!existing.inventory) existing.inventory = [];
   }
 }
 
@@ -113,129 +203,194 @@ function maybeStartGameIfReady(lobby, force = false) {
   lobby.phase = 'IN_PROGRESS';
   lobby.currentTurnIndex = 0;
   lobby.turnCount = 0;
-  lobby.currentSituation = createNewSituation(lobby, 'group');
-  lobby.storyLog.push({
-    type: 'narration',
-    text: lobby.currentSituation.text
-  });
+  lobby.currentSituation = createNewSituation(lobby);
   return true;
 }
 
 function startGameAfterCredits(lobby) {
-  // Called after credits finish - create first situation
+  // Called after credits finish - create detailed intro and first situation
   if (lobby.phase !== 'IN_PROGRESS' || lobby.creditsComplete) return false;
   lobby.creditsComplete = true;
-  lobby.currentSituation = createNewSituation(lobby, 'group');
-  lobby.storyLog.push({
-    type: 'narration',
-    text: lobby.currentSituation.text
-  });
+  
+  // Generate detailed story intro
+  const theme = THEMES[lobby.themeKey] || THEMES['dungeon'];
+  const playerNames = lobby.players.map(p => p.character ? p.character.name : p.name).join(', ');
+  
+  lobby.storyIntro = `${theme.intro}\n\nYour party consists of: ${playerNames}.\n\nYou must work together to survive the dangers ahead. Each of you carries nothing but your wits and determination. Resources are scarce, and every decision matters.`;
+  
+  lobby.currentSituation = createNewSituation(lobby);
   return true;
 }
 
-function createNewSituation(lobby, forcedType = null) {
+function createNewSituation(lobby) {
   const theme = THEMES[lobby.themeKey] || THEMES['dungeon'];
   const alivePlayers = lobby.players.filter(p => p.alive);
-  const motifs = theme.motifs;
-  const foes = theme.foes;
-  const goals = theme.goals;
+  if (alivePlayers.length === 0) return null;
 
-  const motif = motifs[Math.floor(Math.random() * motifs.length)];
-  const foe = foes[Math.floor(Math.random() * foes.length)];
-  const goal = goals[Math.floor(Math.random() * goals.length)];
-
-  const type = forcedType || (Math.random() < 0.5 ? 'individual' : 'group');
-
-  let text;
-  if (type === 'individual') {
-    const current = alivePlayers[lobby.currentTurnIndex % alivePlayers.length];
-    text = `${motif.charAt(0).toUpperCase() + motif.slice(1)}. ` +
-      `The group senses danger as a ${foe} blocks the way forward. ` +
-      `${current.character.name} must act first to help the party ${goal}. What does ${current.character.name} do?`;
+  const motif = theme.motifs[Math.floor(Math.random() * theme.motifs.length)];
+  
+  // Random weights: 50% threat, 15% discovery, 35% neutral (items are rare)
+  const rand = Math.random();
+  let situationType, eventData, text;
+  
+  if (rand < 0.50) {
+    // Threat situation
+    const threat = theme.threats[Math.floor(Math.random() * theme.threats.length)];
+    const targetPlayer = alivePlayers[Math.floor(Math.random() * alivePlayers.length)];
+    
+    situationType = 'threat';
+    eventData = {
+      threat: threat,
+      targetPlayerId: targetPlayer.id,
+      targetPlayerName: targetPlayer.character ? targetPlayer.character.name : targetPlayer.name
+    };
+    
+    text = `${motif.charAt(0).toUpperCase() + motif.slice(1)}. Suddenly, ${threat.desc}!`;
+    
+  } else if (rand < 0.65) {
+    // Discovery situation
+    const discovery = theme.discoveries[Math.floor(Math.random() * theme.discoveries.length)];
+    const finderPlayer = alivePlayers[Math.floor(Math.random() * alivePlayers.length)];
+    
+    situationType = 'discovery';
+    eventData = {
+      discovery: discovery,
+      finderPlayerId: finderPlayer.id,
+      finderPlayerName: finderPlayer.character ? finderPlayer.character.name : finderPlayer.name
+    };
+    
+    text = `${motif.charAt(0).toUpperCase() + motif.slice(1)}. ${finderPlayer.character ? finderPlayer.character.name : finderPlayer.name} discovers ${discovery.desc}.`;
+    
   } else {
-    text = `${motif.charAt(0).toUpperCase() + motif.slice(1)}. ` +
-      `You all realise the next decision could shape your fate. Together, you must choose how to ${goal}. ` +
-      `Each of you may propose a course of action for the group.`;
+    // Neutral/story event
+    const neutral = theme.neutralEvents[Math.floor(Math.random() * theme.neutralEvents.length)];
+    
+    situationType = 'neutral';
+    eventData = { description: neutral.desc };
+    
+    text = `${motif.charAt(0).toUpperCase() + motif.slice(1)}. ${neutral.desc.charAt(0).toUpperCase() + neutral.desc.slice(1)}.`;
   }
 
-  return {
-    type,
-    text,
-    proposals: [], // { id, fromPlayerId, text, votes: 0 }
-    votes: {} // playerId -> proposalId
-  };
+  // Determine if individual or group situation
+  const isIndividual = situationType === 'threat' && Math.random() < 0.5;
+  
+  if (isIndividual) {
+    const currentPlayer = alivePlayers[lobby.currentTurnIndex % alivePlayers.length];
+    return {
+      type: 'individual',
+      situationType: situationType,
+      text,
+      eventData,
+      currentPlayerId: currentPlayer.id,
+      currentPlayerName: currentPlayer.character ? currentPlayer.character.name : currentPlayer.name,
+      resolved: false,
+      actionTaken: null
+    };
+  } else {
+    return {
+      type: 'group',
+      situationType: situationType,
+      text,
+      eventData,
+      proposals: [],
+      votes: {},
+      resolved: false
+    };
+  }
 }
 
-function handlePlayerAction(lobby, playerId, actionText) {
+// Handle player actions (individual situations)
+function handlePlayerAction(lobby, playerId, actionText, itemToUse = null) {
   if (lobby.phase !== 'IN_PROGRESS') return;
   const situation = lobby.currentSituation;
   if (!situation || situation.type !== 'individual') return;
-
-  const currentPlayer = getCurrentTurnPlayer(lobby);
-  if (!currentPlayer || currentPlayer.id !== playerId) return;
-
+  if (situation.currentPlayerId !== playerId) return;
+  
+  const player = lobby.players.find(p => p.id === playerId);
+  if (!player || !player.alive) return;
+  
   const cleaned = (actionText || '').trim();
   if (!cleaned) return;
-
-  const outcome = resolveActionOutcome(lobby, currentPlayer, cleaned);
-  lobby.storyLog.push({
-    type: 'action',
+  
+  // Validate item if provided
+  let itemUsed = null;
+  if (itemToUse) {
+    const itemIndex = player.inventory.indexOf(itemToUse);
+    if (itemIndex !== -1) {
+      player.inventory.splice(itemIndex, 1);
+      itemUsed = itemToUse;
+    }
+  }
+  
+  situation.actionTaken = {
     playerId,
-    playerName: currentPlayer.character.name,
+    playerName: player.character ? player.character.name : player.name,
     text: cleaned,
-    outcomeText: outcome.outcomeText,
-    roll: outcome.roll,
-    successLevel: outcome.successLevel
-  });
-
-  applyOutcomeDamage(lobby, outcome);
-  advanceTurnOrEnd(lobby);
+    itemUsed
+  };
+  
+  // Resolve the situation
+  resolveSituation(lobby);
 }
 
-function handleGroupProposal(lobby, playerId, proposalText) {
+// Handle group proposals
+function handleGroupProposal(lobby, playerId, proposalText, itemToAttach = null) {
   if (lobby.phase !== 'IN_PROGRESS') return;
   const situation = lobby.currentSituation;
   if (!situation || situation.type !== 'group') return;
-  const p = lobby.players.find(p => p.id === playerId && p.alive);
-  if (!p) return;
-
+  
+  const player = lobby.players.find(p => p.id === playerId && p.alive);
+  if (!player) return;
+  
   const cleaned = (proposalText || '').trim();
   if (!cleaned) return;
-
+  
+  // Check if item exists in inventory (but don't remove yet)
+  let hasItem = false;
+  if (itemToAttach) {
+    hasItem = player.inventory.includes(itemToAttach);
+  }
+  
   const existing = situation.proposals.find(pr => pr.fromPlayerId === playerId);
   if (existing) {
     existing.text = cleaned;
+    existing.itemAttached = hasItem ? itemToAttach : null;
   } else {
     situation.proposals.push({
       id: `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       fromPlayerId: playerId,
-      fromName: p.character ? p.character.name : p.name,
+      fromName: player.character ? player.character.name : player.name,
       text: cleaned,
+      itemAttached: hasItem ? itemToAttach : null,
       votes: 0
     });
   }
 }
 
+// Handle group votes
 function handleGroupVote(lobby, playerId, proposalId) {
   if (lobby.phase !== 'IN_PROGRESS') return;
   const situation = lobby.currentSituation;
   if (!situation || situation.type !== 'group') return;
-  const p = lobby.players.find(p => p.id === playerId && p.alive);
-  if (!p) return;
+  
+  const player = lobby.players.find(p => p.id === playerId && p.alive);
+  if (!player) return;
+  
   if (!situation.proposals.find(pr => pr.id === proposalId)) return;
-
+  
   situation.votes[playerId] = proposalId;
-
+  
   const aliveCount = lobby.players.filter(p => p.alive).length;
   const voteCount = Object.keys(situation.votes).length;
-
-  // If all alive players have voted and there's at least one proposal, resolve.
+  
+  // If all alive players voted, resolve
   if (voteCount >= aliveCount && situation.proposals.length > 0) {
     // Count votes
     const tally = {};
     Object.values(situation.votes).forEach(pid => {
       tally[pid] = (tally[pid] || 0) + 1;
     });
+    
     let winnerId = situation.proposals[0].id;
     let maxVotes = -1;
     Object.entries(tally).forEach(([pid, count]) => {
@@ -244,166 +399,198 @@ function handleGroupVote(lobby, playerId, proposalId) {
         winnerId = pid;
       }
     });
+    
     const winningProposal = situation.proposals.find(p => p.id === winnerId);
-    const groupActionText = winningProposal ? winningProposal.text : situation.proposals[0].text;
+    
+    // Remove item from winner's inventory if they attached one
+    if (winningProposal.itemAttached) {
+      const proposer = lobby.players.find(p => p.id === winningProposal.fromPlayerId);
+      if (proposer) {
+        const itemIndex = proposer.inventory.indexOf(winningProposal.itemAttached);
+        if (itemIndex !== -1) {
+          proposer.inventory.splice(itemIndex, 1);
+        }
+      }
+    }
+    
+    situation.chosenProposal = winningProposal;
+    resolveSituation(lobby);
+  }
+}
 
-    const outcome = resolveGroupOutcome(lobby, groupActionText);
+// Resolve situation based on type and player actions
+function resolveSituation(lobby) {
+  const situation = lobby.currentSituation;
+  if (!situation || situation.resolved) return;
+  
+  situation.resolved = true;
+  
+  if (situation.situationType === 'threat') {
+    handleThreatResolution(lobby, situation);
+  } else if (situation.situationType === 'discovery') {
+    handleDiscoveryResolution(lobby, situation);
+  } else {
+    handleNeutralResolution(lobby, situation);
+  }
+  
+  advanceToNextSituation(lobby);
+}
+
+function handleThreatResolution(lobby, situation) {
+  const targetPlayer = lobby.players.find(p => p.id === situation.eventData.targetPlayerId);
+  if (!targetPlayer || !targetPlayer.alive) return;
+  
+  const damage = situation.eventData.threat.damage;
+  let actionText = '';
+  let itemEffect = '';
+  
+  if (situation.type === 'individual' && situation.actionTaken) {
+    actionText = `${situation.actionTaken.playerName} attempts to ${situation.actionTaken.text}. `;
+    
+    if (situation.actionTaken.itemUsed) {
+      const itemInfo = ITEM_TYPES[situation.actionTaken.itemUsed];
+      if (itemInfo) {
+        const healed = Math.min(itemInfo.heal, MAX_HP - targetPlayer.hp);
+        targetPlayer.hp = Math.min(MAX_HP, targetPlayer.hp + itemInfo.heal);
+        itemEffect = `They use ${itemInfo.name} and recover ${healed} HP! `;
+      }
+    }
+  } else if (situation.type === 'group' && situation.chosenProposal) {
+    actionText = `The group decides to ${situation.chosenProposal.text}. `;
+    
+    if (situation.chosenProposal.itemAttached) {
+      const itemInfo = ITEM_TYPES[situation.chosenProposal.itemAttached];
+      if (itemInfo) {
+        const healed = Math.min(itemInfo.heal, MAX_HP - targetPlayer.hp);
+        targetPlayer.hp = Math.min(MAX_HP, targetPlayer.hp + itemInfo.heal);
+        itemEffect = `${situation.chosenProposal.fromName} uses ${itemInfo.name} to help, restoring ${healed} HP! `;
+      }
+    }
+  }
+  
+  targetPlayer.hp -= damage;
+  
+  let damageText = `${situation.eventData.targetPlayerName} takes ${damage} damage!`;
+  
+  if (targetPlayer.hp <= 0) {
+    targetPlayer.hp = 0;
+    targetPlayer.alive = false;
+    damageText += ` ${situation.eventData.targetPlayerName} has fallen...`;
+  }
+  
+  lobby.storyLog.push({
+    type: 'threat',
+    text: actionText + itemEffect + damageText
+  });
+}
+
+function handleDiscoveryResolution(lobby, situation) {
+  const finderPlayer = lobby.players.find(p => p.id === situation.eventData.finderPlayerId);
+  const discovery = situation.eventData.discovery;
+  
+  if (!finderPlayer || !finderPlayer.alive) return;
+  
+  if (discovery.item) {
+    finderPlayer.inventory.push(discovery.item);
+    const itemInfo = ITEM_TYPES[discovery.item];
     lobby.storyLog.push({
-      type: 'groupAction',
-      text: groupActionText,
-      outcomeText: outcome.outcomeText,
-      roll: outcome.roll,
-      successLevel: outcome.successLevel
+      type: 'discovery',
+      text: `${situation.eventData.finderPlayerName} obtained ${itemInfo.name}!`
     });
-
-    applyOutcomeDamage(lobby, outcome);
-    advanceTurnOrEnd(lobby);
+  } else if (discovery.heal) {
+    const oldHp = finderPlayer.hp;
+    finderPlayer.hp = Math.min(MAX_HP, finderPlayer.hp + discovery.heal);
+    const healed = finderPlayer.hp - oldHp;
+    lobby.storyLog.push({
+      type: 'discovery',
+      text: `${situation.eventData.finderPlayerName} recovered ${healed} HP!`
+    });
   }
 }
 
-function getCurrentTurnPlayer(lobby) {
-  const alivePlayers = lobby.players.filter(p => p.alive);
-  if (alivePlayers.length === 0) return null;
-  const idx = lobby.currentTurnIndex % alivePlayers.length;
-  return alivePlayers[idx];
-}
-
-function resolveActionOutcome(lobby, player, actionText) {
-  const roll = rollD20();
-  const bonus = 0; // Could derive from character role/trait
-  const total = roll + bonus;
-  let successLevel;
-  if (total >= 18) successLevel = 'criticalSuccess';
-  else if (total >= 12) successLevel = 'success';
-  else if (total >= 7) successLevel = 'partial';
-  else successLevel = 'fail';
-
-  let outcomeText;
-  switch (successLevel) {
-    case 'criticalSuccess':
-      outcomeText = `${player.character.name}'s attempt to "${actionText}" works far better than expected. The threat is pushed back and the group gains a brief advantage.`;
-      break;
-    case 'success':
-      outcomeText = `${player.character.name} manages to "${actionText}" well enough to keep the group safe, at least for now.`;
-      break;
-    case 'partial':
-      outcomeText = `${player.character.name} tries to "${actionText}". It sort of works, but there are complications and the group is left off-balance.`;
-      break;
-    case 'fail':
-      outcomeText = `${player.character.name} attempts to "${actionText}" but it goes badly. The situation becomes more dangerous for everyone.`;
-      break;
+function handleNeutralResolution(lobby, situation) {
+  let text = 'The party observes their surroundings carefully.';
+  
+  if (situation.type === 'group' && situation.chosenProposal) {
+    text = `The group decides to ${situation.chosenProposal.text}.`;
+  } else if (situation.type === 'individual' && situation.actionTaken) {
+    text = `${situation.actionTaken.playerName} ${situation.actionTaken.text}.`;
   }
-
-  return { roll: total, rawRoll: roll, successLevel, outcomeText };
+  
+  lobby.storyLog.push({
+    type: 'neutral',
+    text
+  });
 }
 
-function resolveGroupOutcome(lobby, actionText) {
-  const roll = rollD20();
-  let successLevel;
-  if (roll >= 18) successLevel = 'criticalSuccess';
-  else if (roll >= 12) successLevel = 'success';
-  else if (roll >= 7) successLevel = 'partial';
-  else successLevel = 'fail';
-
-  let outcomeText;
-  switch (successLevel) {
-    case 'criticalSuccess':
-      outcomeText = `The group agrees to "${actionText}", and it works brilliantly. You create a strong advantage and buy precious time.`;
-      break;
-    case 'success':
-      outcomeText = `Together, you carry out the plan to "${actionText}". It succeeds, though the danger is not gone.`;
-      break;
-    case 'partial':
-      outcomeText = `You decide to "${actionText}". The result is mixed: some things improve, but new problems appear.`;
-      break;
-    case 'fail':
-      outcomeText = `The group attempts to "${actionText}", but it backfires. The environment and enemies seem to close in.`;
-      break;
+// Handle item usage
+function useItem(lobby, playerId, itemType, targetPlayerId) {
+  const player = lobby.players.find(p => p.id === playerId);
+  if (!player || !player.alive) return { error: 'Player not found or dead' };
+  
+  const itemIndex = player.inventory.indexOf(itemType);
+  if (itemIndex === -1) return { error: 'Item not in inventory' };
+  
+  const itemInfo = ITEM_TYPES[itemType];
+  if (!itemInfo) return { error: 'Invalid item' };
+  
+  let targetPlayer = player;
+  if (itemInfo.targetOther && targetPlayerId) {
+    targetPlayer = lobby.players.find(p => p.id === targetPlayerId);
+    if (!targetPlayer || !targetPlayer.alive) return { error: 'Target not found or dead' };
   }
-
-  return { roll, successLevel, outcomeText };
+  
+  // Use the item
+  player.inventory.splice(itemIndex, 1);
+  
+  const oldHp = targetPlayer.hp;
+  targetPlayer.hp = Math.min(MAX_HP, targetPlayer.hp + itemInfo.heal);
+  const healed = targetPlayer.hp - oldHp;
+  
+  const playerName = player.character ? player.character.name : player.name;
+  const targetName = targetPlayer.character ? targetPlayer.character.name : targetPlayer.name;
+  
+  let message;
+  if (playerId === targetPlayer.id) {
+    message = `${playerName} used ${itemInfo.name} and recovered ${healed} HP!`;
+  } else {
+    message = `${playerName} used ${itemInfo.name} on ${targetName}, restoring ${healed} HP!`;
+  }
+  
+  lobby.storyLog.push({
+    type: 'item',
+    text: message
+  });
+  
+  return { success: true };
 }
 
-function applyOutcomeDamage(lobby, outcome) {
-  // Simple model: on fail/partial, random alive players take damage.
+function advanceToNextSituation(lobby) {
+  lobby.turnCount++;
+  
   const alive = lobby.players.filter(p => p.alive);
-  if (alive.length === 0) return;
-
-  if (outcome.successLevel === 'fail') {
-    const target = alive[Math.floor(Math.random() * alive.length)];
-    const dmg = 3;
-    target.hp -= dmg;
-    if (target.hp <= 0) {
-      target.hp = 0;
-      target.alive = false;
-      lobby.storyLog.push({
-        type: 'system',
-        text: `${target.character ? target.character.name : target.name} is overwhelmed by the danger and falls.`
-      });
-    } else {
-      lobby.storyLog.push({
-        type: 'system',
-        text: `${target.character ? target.character.name : target.name} is badly hurt and loses ${dmg} HP.`
-      });
-    }
-  } else if (outcome.successLevel === 'partial') {
-    const target = alive[Math.floor(Math.random() * alive.length)];
-    const dmg = 1 + Math.floor(Math.random() * 2);
-    target.hp -= dmg;
-    if (target.hp <= 0) {
-      target.hp = 0;
-      target.alive = false;
-      lobby.storyLog.push({
-        type: 'system',
-        text: `${target.character ? target.character.name : target.name} is taken out by the side effects of the plan.`
-      });
-    } else {
-      lobby.storyLog.push({
-        type: 'system',
-        text: `${target.character ? target.character.name : target.name} is shaken and loses ${dmg} HP.`
-      });
-    }
-  }
-}
-
-function advanceTurnOrEnd(lobby) {
-  lobby.turnCount += 1;
-
-  const alive = lobby.players.filter(p => p.alive);
+  
+  // Check win/loss
   if (alive.length === 0) {
     lobby.phase = 'ENDED';
     lobby.storyLog.push({
       type: 'system',
-      text: 'With no one left standing, the story ends in failure.'
+      text: 'The entire party has fallen. Game Over.'
     });
     return;
   }
-
+  
   if (lobby.turnCount >= MAX_TURNS) {
     lobby.phase = 'ENDED';
     lobby.storyLog.push({
       type: 'system',
-      text: 'After many trials, your story reaches its natural conclusion. Whether this counts as victory is up to you.'
+      text: `After ${MAX_TURNS} harrowing encounters, the survivors have made it through! Victory!`
     });
     return;
   }
-
-  // Advance turn index cyclically
-  lobby.currentTurnIndex = (lobby.currentTurnIndex + 1) % alive.length;
-
-  // Alternate between individual and group situations loosely
-  const forcedType = lobby.turnCount % 3 === 0 ? 'group' : null;
-  lobby.currentSituation = createNewSituation(lobby, forcedType);
-  lobby.currentSituation.votes = {};
-  lobby.currentSituation.proposals = [];
-  lobby.storyLog.push({
-    type: 'narration',
-    text: lobby.currentSituation.text
-  });
-}
-
-function rollD20() {
-  return 1 + Math.floor(Math.random() * 20);
+  
+  // Generate next situation
+  lobby.currentSituation = createNewSituation(lobby);
 }
 
 function getPublicLobbyState(lobby, requestingPlayerId = null) {
@@ -541,11 +728,7 @@ function startGameAfterCredits(lobby) {
   // Called when credits finish - create first situation if not yet created
   if (lobby.phase !== 'IN_PROGRESS' || lobby.creditsComplete) return false;
   lobby.creditsComplete = true;
-  lobby.currentSituation = createNewSituation(lobby, 'group');
-  lobby.storyLog.push({
-    type: 'narration',
-    text: lobby.currentSituation.text
-  });
+  lobby.currentSituation = createNewSituation(lobby);
   return true;
 }
 
@@ -563,5 +746,6 @@ module.exports = {
   getPublicLobbyState,
   serializeCampaign,
   deserializeCampaign,
-  startGameAfterCredits
+  startGameAfterCredits,
+  ITEM_TYPES
 };
