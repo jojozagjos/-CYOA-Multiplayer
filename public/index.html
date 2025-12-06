@@ -2,376 +2,437 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>CYOA</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=Orbitron:wght@500;700&display=swap" rel="stylesheet">
+  <title>God Sim World - Top Down</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <!-- Black fade transition overlay -->
-  <div id="fade-overlay" class="fade-overlay"></div>
-  
-  <!-- Settings icon (accessible from any screen) -->
-  <button id="btn-settings" class="settings-icon" aria-label="Settings" title="Settings">⚙️</button>
-
-  <div id="app">
-    <div id="bg-layers">
-      <div class="bg-gradient"></div>
-      <div class="bg-grid"></div>
-      <div id="dynamic-bg" class="dynamic-bg"></div>
-    </div>
-
-    <!-- Top bar removed per user request -->
-
-    <main class="fullscreen">
-      <!-- INTRO SCREEN -->
-      <section id="screen-intro" class="screen screen-center">
-        <div class="intro-container">
-          <div class="intro-creator">Made by Joseph Slade</div>
-          <div class="intro-logo">CYOA</div>
-          <div class="intro-tagline">Choose Your Own Adventure</div>
-        </div>
-      </section>
-
-      <!-- MAIN MENU -->
-      <section id="screen-main-menu" class="screen screen-center hidden">
-        <div class="menu-panel card-glass">
-          <h1 class="title">CYOA</h1>
-          <p class="subtitle">Collaborative tabletop storytelling — host a lobby or join friends.</p>
-
-          <div class="form-row">
-            <input type="text" id="input-name" placeholder="Enter your display name">
+  <div id="appRoot">
+    <!-- INTRO SCREEN -->
+    <section id="introScreen" class="screen visible">
+      <div class="intro-container">
+        <div class="intro-content">
+          <div class="intro-logo">
+            <h1 class="intro-title">God Sim World</h1>
+            <div class="intro-particles">
+              <span class="particle"></span>
+              <span class="particle"></span>
+              <span class="particle"></span>
+              <span class="particle"></span>
+              <span class="particle"></span>
+            </div>
           </div>
+          <p class="intro-tagline">Shape worlds. Create life. Play god.</p>
+          <button id="btnStartIntro" class="intro-btn">Start</button>
+          <div class="intro-features">
+            <div class="feature">
+              <span class="feature-icon">🌍</span>
+              <span class="feature-text">Build Worlds</span>
+            </div>
+            <div class="feature">
+              <span class="feature-icon">🧬</span>
+              <span class="feature-text">Evolve Creatures</span>
+            </div>
+            <div class="feature">
+              <span class="feature-icon">👥</span>
+              <span class="feature-text">Multiplayer</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
 
+    <!-- MAIN MENU -->
+    <section id="mainMenu" class="screen hidden">
+      <div class="menu-container">
+        <div class="menu-inner">
+          <div class="main-menu-header">
+            <h1 class="game-title">God Sim World</h1>
+            <p class="game-subtitle">Grow a world of your own creatures, alone or with friends.</p>
+          </div>
+          <div class="menu-player-name">
+            <div class="input-wrapper">
+              <span class="input-icon">👤</span>
+              <input id="menuPlayerNameInput" placeholder="Display Name" />
+            </div>
+          </div>
           <div class="menu-buttons">
-            <button id="btn-host" class="btn-primary">Host Game</button>
-            <button id="btn-join" class="btn-ghost">Join Game</button>
+            <button id="btnNewWorld" class="primary menu-btn" disabled>
+              <span class="btn-icon">🌟</span>
+              <span class="btn-content">
+                <span class="btn-title">Create New World</span>
+                <span class="btn-subtitle">Start your own universe</span>
+              </span>
+            </button>
+            <button id="btnMultiplayer" class="menu-btn" disabled>
+              <span class="btn-icon">👥</span>
+              <span class="btn-content">
+                <span class="btn-title">Multiplayer</span>
+                <span class="btn-subtitle">Join a friend's world</span>
+              </span>
+            </button>
+            <button id="btnYourWorlds" class="menu-btn" disabled>
+              <span class="btn-icon">🗺️</span>
+              <span class="btn-content">
+                <span class="btn-title">Your Worlds</span>
+                <span class="btn-subtitle">Continue your creation</span>
+              </span>
+            </button>
+            <button id="btnSettings" class="menu-btn" disabled>
+              <span class="btn-icon">⚙️</span>
+              <span class="btn-content">
+                <span class="btn-title">Settings</span>
+                <span class="btn-subtitle">Customize your experience</span>
+              </span>
+            </button>
           </div>
-
-          <div style="margin-top:12px">
-            <button id="btn-char-editor" class="btn-ghost">Character Editor</button>
-          </div>
-
-          <div id="join-panel" class="hidden join-panel">
-            <input type="text" id="input-lobby-code" placeholder="Lobby Code (ABCD)">
-            <button id="btn-join-confirm" class="btn-primary">Join</button>
-          </div>
-
-          <div class="quick-links">
-            <small>Tip: Use a memorable name and share the lobby code with friends.</small>
-          </div>
-
-          <div class="load-campaign-section" style="margin-top:20px;border-top:1px solid rgba(255,255,255,0.04);padding-top:20px">
-            <p class="subtitle" style="margin:0 0 12px">Load Saved Campaign</p>
-            <div style="display:flex;gap:8px;justify-content:center">
-              <input type="text" id="input-campaign-id" placeholder="Campaign ID" style="max-width:220px;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit">
-              <button id="btn-load-campaign" class="btn-ghost">Load</button>
-            </div>
-            <div id="load-status" style="margin-top:8px;font-size:13px;color:var(--muted)"></div>
-          </div>
-        </div>
-      </section>
-
-      <!-- THEME VOTE (separate screen) -->
-      <section id="screen-theme-vote" class="screen hidden screen-center">
-        <div class="menu-panel card-glass">
-          <h2 class="title">Choose a Theme</h2>
-          <p class="subtitle">Vote for the story theme or add a new one.</p>
-          <div id="theme-vote-section">
-            <div id="theme-options" class="pill-row"></div>
-            <div style="margin-top:12px;display:flex;gap:8px;justify-content:center;flex-direction:column;align-items:center">
-              <div style="display:flex;gap:8px;justify-content:center;width:100%">
-                <input id="new-theme-input" placeholder="Add a custom theme" style="flex:1;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit">
-                <button id="btn-add-theme" class="btn-primary">Add</button>
-              </div>
-              <input id="new-theme-desc" placeholder="Short description (optional)" style="width:92%;margin-top:8px;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit;font-size:13px">
-            </div>
-              <!-- Back button removed as requested -->
-          </div>
-        </div>
-      </section>
-
-      <!-- CHARACTER EDITOR SCREEN -->
-      <section id="screen-char-editor" class="screen screen-center hidden">
-        <div class="lobby-container" style="max-width:800px">
-          <div class="lobby-header-card card-glass">
-            <div class="lobby-header-content" style="justify-content:center">
-              <div class="lobby-info-section" style="align-items:center;text-align:center">
-                <div class="lobby-code" style="font-size:32px;letter-spacing:0.1em">Character Editor</div>
-                <div class="lobby-hint">Create, edit, and manage your characters</div>
-              </div>
-            </div>
-          </div>
-
-          <div class="lobby-section card-glass">
-            <div class="char-form">
-              <div class="form-group">
-                <label class="form-label">Character Name</label>
-                <input type="text" id="editor-char-name" class="form-input" placeholder="Enter character name">
-              </div>
-              
-              <div class="form-row-split">
-                <div class="form-group">
-                  <label class="form-label">Role</label>
-                  <input type="text" id="editor-char-role" class="form-input" placeholder="e.g., Scout">
-                </div>
-                <div class="form-group">
-                  <label class="form-label">Trait</label>
-                  <input type="text" id="editor-char-trait" class="form-input" placeholder="e.g., Reckless">
-                </div>
-              </div>
-
-              <div class="form-group">
-                <label class="form-label">Draw Your Character</label>
-                <div class="canvas-container" style="max-width:320px;margin:0 auto">
-                  <canvas id="editor-canvas" width="320" height="320"></canvas>
-                </div>
-                
-                <div class="canvas-toolbar">
-                  <div class="toolbar-group">
-                    <label class="color-input-wrapper" title="Background Color">
-                      <span class="color-label">BG</span>
-                      <input type="color" id="editor-canvas-bg" value="#ffffff" class="color-input">
-                    </label>
-                    <input type="range" id="editor-brush-size" min="1" max="40" value="3" class="brush-slider">
-                  </div>
-                  <div class="toolbar-group">
-                    <button id="editor-btn-undo" class="tool-btn" title="Undo">↶</button>
-                    <button id="editor-btn-redo" class="tool-btn" title="Redo">↷</button>
-                    <button id="editor-btn-eraser" class="tool-btn" title="Eraser">Eraser</button>
-                    <button id="editor-btn-clear" class="tool-btn" title="Clear">🗑️</button>
-                  </div>
-                </div>
-              </div>
-
-              <div class="char-actions-modern">
-                <div class="char-secondary-actions" style="width:100%;justify-content:space-between">
-                  <button id="editor-btn-new" class="btn-ghost">New Character</button>
-                  <div style="display:flex;gap:8px">
-                    <button id="editor-btn-import" class="btn-ghost">Import</button>
-                    <button id="editor-btn-export" class="btn-primary">Export</button>
-                  </div>
-                </div>
-                <input id="editor-input-import" type="file" accept="application/json" style="display:none">
-              </div>
-            </div>
-          </div>
-
-          <div style="margin-top:20px;text-align:center">
-            <button id="editor-btn-back" class="btn-ghost">Back to Menu</button>
-          </div>
-        </div>
-      </section>
-
-      <!-- LOBBY -->
-      <section id="screen-lobby" class="screen hidden screen-center">
-        <div class="lobby-container">
-          <!-- Lobby Header -->
-          <div class="lobby-header-card card-glass">
-            <div class="lobby-header-content">
-              <div class="lobby-info-section">
-                <div class="lobby-label">Lobby Code</div>
-                <div id="lbl-lobby-id" class="lobby-code">----</div>
-                <div class="lobby-hint">Share this code with friends</div>
-              </div>
-              <div class="lobby-player-info">
-                <div class="player-label">You are</div>
-                <div id="lbl-player-name" class="player-name-display">---</div>
-              </div>
-            </div>
-          </div>
-
-          <div class="lobby-main-grid">
-            <!-- Left Column: Players -->
-            <div class="lobby-section card-glass">
-              <div class="section-header">
-                <h3 class="section-title">Players in Lobby</h3>
-                <div class="player-count" id="player-count">0</div>
-              </div>
-              <ul id="list-players" class="players-list-modern"></ul>
-              
-              <!-- Start Game Button -->
-              <div class="lobby-action-area">
-                <button id="btn-go-to-game" class="btn-primary btn-large hidden">Start Game</button>
-              </div>
-            </div>
-
-            <!-- Right Column: Character Creation -->
-            <div class="lobby-section card-glass" id="character-section">
-              <div class="section-header">
-                <h3 class="section-title">Create Your Character</h3>
-              </div>
-              
-              <div class="char-form">
-                <div class="form-group">
-                  <label class="form-label">Character Name</label>
-                  <input type="text" id="char-name" class="form-input" placeholder="Enter character name">
-                </div>
-                
-                <div class="form-row-split">
-                  <div class="form-group">
-                    <label class="form-label">Role</label>
-                    <input type="text" id="char-role" class="form-input" placeholder="e.g., Scout">
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">Trait</label>
-                    <input type="text" id="char-trait" class="form-input" placeholder="e.g., Reckless">
-                  </div>
-                </div>
-
-                <div class="form-group">
-                  <label class="form-label">Draw Your Character</label>
-                  <div class="canvas-container" style="max-width:320px;margin:0 auto">
-                    <canvas id="char-canvas" width="320" height="320"></canvas>
-                  </div>
-                  
-                  <div class="canvas-toolbar">
-                    <div class="toolbar-group">
-                      <label class="color-input-wrapper" title="Background Color">
-                        <span class="color-label">BG</span>
-                        <input type="color" id="canvas-bg-color" value="#ffffff" class="color-input">
-                      </label>
-                      <input type="range" id="brush-size" min="1" max="40" value="3" class="brush-slider">
-                    </div>
-                    <div class="toolbar-group">
-                      <button id="btn-undo" class="tool-btn" title="Undo">↶</button>
-                      <button id="btn-redo" class="tool-btn" title="Redo">↷</button>
-                      <button id="btn-eraser" class="tool-btn" title="Eraser">Eraser</button>
-                      <button id="btn-clear-canvas" class="tool-btn" title="Clear">🗑️</button>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="char-actions-modern">
-                  <button id="btn-save-char" class="btn-primary btn-block">✓ Use This Character</button>
-                  <div class="char-secondary-actions">
-                    <button id="btn-export-char" class="btn-ghost btn-sm">Export</button>
-                    <button id="btn-import-char" class="btn-ghost btn-sm">Import</button>
-                  </div>
-                  <input id="input-import-char" type="file" accept="application/json" style="display:none">
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- GAME -->
-      <section id="screen-game" class="screen hidden screen-edge">
-        <div class="game-shell">
-          <!-- Current Narration Display (prominent) -->
-          <div id="current-narration" class="current-narration hidden">
-            <div class="narration-label">Current Situation</div>
-            <div id="story-intro" class="story-intro" style="display:none;"></div>
-            <div id="narration-text" class="narration-text"></div>
-          </div>
-
-          <div class="game-main-grid">
-            <!-- Story Log -->
-            <div class="story-column">
-              <div class="story-header">
-                <h3 id="game-theme-heading">Story Log</h3>
-                <div class="game-actions">
-                  <button id="btn-save-game" class="btn-ghost">💾 Save</button>
-                  <span id="save-status" class="save-status"></span>
-                </div>
-              </div>
-              <!-- Story log display -->
-              <div id="story-log" class="story-log"></div>
-
-              <!-- Inventory Panel -->
-              <div id="inventory-panel" class="inventory-panel hidden">
-                <div class="panel-header">Your Inventory (click to attach to action)</div>
-                <div id="inventory-list" class="inventory-list"></div>
-              </div>
-
-              <!-- Action Panels (context-dependent) -->
-              <div id="individual-panel" class="action-panel hidden">
-                <div class="panel-header">Your Turn - What do you do?</div>
-                <textarea id="input-action" placeholder="Describe your action..."></textarea>
-                <button id="btn-send-action" class="btn-primary">Take Action</button>
-              </div>
-
-              <div id="group-proposal-panel" class="action-panel hidden">
-                <div class="panel-header">Propose Group Action</div>
-                <input id="input-proposal" placeholder="What should the party do?">
-                <button id="btn-send-proposal" class="btn-primary">Propose</button>
-              </div>
-
-              <div id="group-vote-panel" class="action-panel hidden">
-                <div class="panel-header">Vote on Proposals</div>
-                <div id="proposal-list" class="proposal-list"></div>
-              </div>
-
-            </div>
-
-            <!-- Party Sidebar -->
-            <aside class="party-sidebar">
-              <h4>Party</h4>
-              <ul id="sidebar-players"></ul>
-              <div class="game-meta">
-                <div id="game-phase-label">Phase: --</div>
-                <div id="campaign-id-label"></div>
-              </div>
-            </aside>
-          </div>
-        </div>
-      </section>
-    </main>
-
-    <!-- Credits / introduction screen shown after voting finishes -->
-    <div id="credits-screen" class="overlay hidden" aria-hidden="true">
-      <div class="credits-card">
-        <div class="credits-media">
-          <img id="credits-img" src="" alt="Character image" />
-        </div>
-        <div class="credits-body">
-          <h2 id="credits-name" class="credits-name-anim">Name</h2>
-          <div id="credits-role" class="credits-meta credits-role-anim">Role</div>
-          <div id="credits-trait" class="credits-meta credits-trait-anim">Trait</div>
-          <p id="credits-desc" class="credits-desc credits-desc-anim"></p>
         </div>
       </div>
-    </div>
+    </section>
 
-    <div id="notifications" class="notifications" aria-live="polite" aria-atomic="true"></div>
-
-    <!-- Settings Panel -->
-    <div id="settings-panel" class="settings-panel hidden" aria-hidden="true">
-      <div class="settings-content">
-        <div class="settings-header">
-          <h2>Settings</h2>
-          <button id="btn-close-settings" class="btn-ghost">&times;</button>
-        </div>
-        <div class="settings-body">
-          <div class="setting-group">
-            <label for="volume-master">Master Volume</label>
-            <input type="range" id="volume-master" min="0" max="100" value="70">
-            <span id="volume-master-val" class="volume-val">70%</span>
+    <!-- NEW WORLD SCREEN -->
+    <section id="newWorldScreen" class="screen hidden">
+      <div class="menu-container">
+        <div class="menu-inner">
+          <div class="screen-header">
+            <h2>Create New World</h2>
+            <p class="screen-subtitle">Customize your universe</p>
           </div>
-          <div class="setting-group">
-            <label for="volume-music">Music Volume</label>
-            <input type="range" id="volume-music" min="0" max="100" value="50">
-            <span id="volume-music-val" class="volume-val">50%</span>
+          <div class="form-card">
+            <label class="modern-label">
+              <span class="label-icon">🌍</span>
+              <span>World name</span>
+            </label>
+            <input id="worldNameInput" placeholder="My island world" class="modern-input">
           </div>
-          <div class="setting-group">
-            <label for="volume-sfx">Sound Effects</label>
-            <input type="range" id="volume-sfx" min="0" max="100" value="60">
-            <span id="volume-sfx-val" class="volume-val">60%</span>
+          <div class="form-card">
+            <label class="modern-label">
+              <span class="label-icon">📏</span>
+              <span>World Size</span>
+            </label>
+            <select id="worldSizeSelect" class="modern-input">
+              <option value="48">Small (48x48)</option>
+              <option value="64" selected>Medium (64x64)</option>
+              <option value="96">Large (96x96)</option>
+            </select>
           </div>
-          <div class="setting-group">
-            <label for="volume-narration">Narration Voice</label>
-            <input type="range" id="volume-narration" min="0" max="100" value="80">
-            <span id="volume-narration-val" class="volume-val">80%</span>
+          <div class="form-card">
+            <label class="modern-label">
+              <span class="label-icon">🏝️</span>
+              <span>Island Size</span>
+            </label>
+            <input id="islandSizeSlider" type="range" min="20" max="80" value="50" class="modern-input">
+            <span id="islandSizeValue">50%</span>
           </div>
-          <!-- Narration speed setting removed per user request -->
+          <div class="form-card">
+            <label class="modern-label">
+              <span class="label-icon">🌡️</span>
+              <span>Climate</span>
+            </label>
+            <select id="climateSelect" class="modern-input">
+              <option value="tropical">Tropical (Warm & Wet)</option>
+              <option value="temperate" selected>Temperate (Balanced)</option>
+              <option value="arid">Arid (Hot & Dry)</option>
+              <option value="cold">Cold (Cool & Dry)</option>
+            </select>
+          </div>
+          <div class="form-card">
+            <label class="modern-label">
+              <span class="label-icon">🎲</span>
+              <span>Seed (optional)</span>
+            </label>
+            <input id="worldSeedInput" type="number" placeholder="Random" class="modern-input">
+          </div>
+          <div class="menu-buttons row">
+            <button id="createWorldBtn" class="primary">
+              <span>✨</span> Create World
+            </button>
+            <button id="backFromNewWorldBtn">
+              <span>←</span> Back
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+    </section>
+
+    <!-- MULTIPLAYER SCREEN (reuses old 'lobby' id) -->
+    <section id="lobby" class="screen hidden">
+      <div class="menu-container">
+        <div class="menu-inner">
+          <div class="menu-header-row">
+            <div>
+              <h2>Multiplayer</h2>
+              <p class="screen-subtitle">Connect with other creators</p>
+            </div>
+            <button id="backFromMultiplayerBtn" class="back-btn">← Back</button>
+          </div>
+          <div class="panel interactive-panel">
+            <div class="panel-icon">🌐</div>
+            <h3>Join a World</h3>
+            <label class="modern-label">
+              <span class="label-icon">🔑</span>
+              <span>World ID</span>
+            </label>
+            <input id="joinWorldIdInput" placeholder="Enter World ID" class="modern-input">
+            <div class="menu-buttons" style="margin-top: 16px;">
+              <button id="joinWorldBtn" class="primary">
+                <span>🚀</span> Join World
+              </button>
+            </div>
+            <p class="hint">💡 Ask your friends for their world ID to join their universe.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- YOUR WORLDS SCREEN -->
+    <section id="yourWorldsScreen" class="screen hidden">
+      <div class="menu-container">
+        <div class="menu-inner">
+          <div class="menu-header-row">
+            <div>
+              <h2>Your Worlds</h2>
+              <p class="screen-subtitle">Manage your created universes</p>
+            </div>
+            <button id="backFromYourWorldsBtn" class="back-btn">← Back</button>
+          </div>
+          <div class="your-worlds-grid">
+            <div class="panel interactive-panel">
+              <div class="panel-header-actions">
+                <h3>All Worlds</h3>
+                <button id="refreshWorldsBtn" class="refresh-btn">🔄 Refresh</button>
+              </div>
+              <ul id="worldList" class="world-list"></ul>
+              <p class="hint">💡 Click a world to preview. Right-click to delete.</p>
+            </div>
+            <div class="panel interactive-panel" id="worldPreviewPanel">
+              <div class="panel-header-actions">
+                <h3>Preview</h3>
+                <div class="preview-actions">
+                  <button id="enterWorldBtn" class="primary" disabled>Enter World</button>
+                  <button id="copyWorldIdBtn" disabled>Copy ID</button>
+                </div>
+              </div>
+              <div id="worldPreviewInfo" class="preview-info">Select a world to see details.</div>
+              <div class="preview-canvas-wrap">
+                <canvas id="worldPreviewCanvas" width="256" height="256"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SETTINGS SCREEN -->
+    <section id="settingsScreen" class="screen hidden">
+      <div class="menu-container">
+        <div class="menu-inner">
+          <div class="menu-header-row">
+            <div>
+              <h2>Settings</h2>
+              <p class="screen-subtitle">Customize your divine experience</p>
+            </div>
+            <button id="backFromSettingsBtn" class="back-btn">← Back</button>
+          </div>
+
+          <div class="panel interactive-panel">
+            <div class="panel-icon">🔊</div>
+            <h3>Audio</h3>
+            <label class="modern-label">
+              <span>Master volume</span>
+              <input id="settingMasterVolume" type="range" min="0" max="1" step="0.05">
+            </label>
+            <label class="modern-label">
+              <span>Creature sounds</span>
+              <input id="settingCreatureVolume" type="range" min="0" max="1" step="0.05">
+            </label>
+            <label class="inline modern-checkbox">
+              <input id="settingMute" type="checkbox">
+              <span>Mute all sounds</span>
+            </label>
+          </div>
+
+          <div class="panel interactive-panel">
+            <div class="panel-icon">👁️</div>
+            <h3>Visuals</h3>
+            <label class="inline modern-checkbox">
+              <input id="settingShowGrid" type="checkbox">
+              <span>Show world grid</span>
+            </label>
+            <label class="inline modern-checkbox">
+              <input id="settingReduceEffects" type="checkbox">
+              <span>Reduce effects (for low-end devices)</span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- GAME SCREEN -->
+    <section id="game" class="screen hidden">
+      <div id="topBar">
+        <div class="top-left">
+          <span id="worldLabel"></span>
+          <span id="playerLabel"></span>
+          <span id="creatureCountLabel" style="margin-left: 15px;">🦎 0</span>
+        </div>
+        <div class="top-center">
+          <span id="xpLabel"></span>
+          <span id="levelLabel"></span>
+          <button id="pauseBtn" style="margin-left: 10px; padding: 4px 12px; font-size: 0.9rem;">⏸️ Pause</button>
+          <select id="speedSelect" style="margin-left: 10px; padding: 4px 8px; font-size: 0.9rem;">
+            <option value="0.5">0.5x</option>
+            <option value="1" selected>1x</option>
+            <option value="2">2x</option>
+            <option value="3">3x</option>
+          </select>
+          <button id="zoomInBtn" style="margin-left: 10px; padding: 4px 10px; font-size: 0.9rem;">🔍+</button>
+          <button id="zoomOutBtn" style="padding: 4px 10px; font-size: 0.9rem;">🔍-</button>
+          <button id="resetCameraBtn" style="padding: 4px 10px; font-size: 0.9rem;">Reset</button>
+        </div>
+        <div class="top-right">
+          <button id="openSettingsInGameBtn">Settings</button>
+          <button id="backToMainMenuBtn">Exit to Main Menu</button>
+        </div>
+      </div>
+      
+      <div id="toolbar">
+        <div class="toolbar-section">
+          <h4>Creator</h4>
+          <button id="toolbarCreatorBtn" class="toolbar-btn">
+            <span>🎨</span> Creature Creator
+          </button>
+        </div>
+        <div class="toolbar-section">
+          <h4>Powers</h4>
+          <button id="powerTerraformBtn" class="toolbar-btn" disabled>
+            <span>⛰️</span> Terraform
+          </button>
+          <button id="powerFertilityBtn" class="toolbar-btn" disabled>
+            <span>🌱</span> Fertility
+          </button>
+          <button id="powerRainBtn" class="toolbar-btn" disabled>
+            <span>🌧️</span> Rain
+          </button>
+          <button id="powerHeatwaveBtn" class="toolbar-btn" disabled>
+            <span>☀️</span> Heatwave
+          </button>
+        </div>
+        <div class="toolbar-section">
+          <h4>View</h4>
+          <button id="viewBiomeBtn" class="toolbar-btn active">Biomes</button>
+          <button id="viewFoodBtn" class="toolbar-btn">Food</button>
+          <button id="viewTempBtn" class="toolbar-btn">Temperature</button>
+        </div>
+      </div>
+
+      <div id="mainArea">
+        <div id="canvasContainer">
+          <canvas id="gameCanvas" width="768" height="768"></canvas>
+        </div>
+        <div id="sidebar">
+          <div class="panel sidebar-section">
+            <h3>Players</h3>
+            <ul id="playersList" class="players-list"></ul>
+          </div>
+
+          <div id="creatorPanel" class="panel" style="display: none;">
+            <div class="panel-header">
+              <h3>Creature Creator</h3>
+            </div>
+            <p>Draw with your mouse or upload an image, then record a sound.</p>
+            <canvas id="creatureCanvas" width="128" height="128"></canvas>
+            <div class="row gap">
+              <button id="clearCreatureCanvasBtn">Clear</button>
+              <input type="file" id="creatureImageUpload" accept="image/*">
+            </div>
+            <div class="sound-controls">
+              <button id="startRecordingBtn">Record</button>
+              <button id="stopRecordingBtn" disabled>Stop</button>
+              <span id="recordingStatus">No sound recorded</span>
+            </div>
+            <div class="form-grid">
+              <label>
+                <span>Name</span>
+                <input id="creatureNameInput" placeholder="Species name">
+              </label>
+              <label>
+                <span>Diet</span>
+                <select id="creatureDietSelect">
+                  <option value="plant">Plant eater</option>
+                  <option value="omnivore">Omnivore</option>
+                  <option value="carnivore">Carnivore</option>
+                </select>
+              </label>
+              <label>
+                <span>Size</span>
+                <input id="creatureSizeInput" type="number" value="1" min="0.5" max="3" step="0.1">
+              </label>
+              <label>
+                <span>Speed</span>
+                <input id="creatureSpeedInput" type="number" value="1" min="0.5" max="3" step="0.1">
+              </label>
+            </div>
+            <button id="createCreatureTypeBtn" class="primary full">Create Species</button>
+            <p class="hint">Select a species below, then click on the world to spawn it.</p>
+          </div>
+
+          <div class="panel sidebar-section">
+            <h3>Known Species</h3>
+            <ul id="speciesList"></ul>
+          </div>
+
+          <div class="panel sidebar-section">
+            <h3>Tile Info</h3>
+            <div id="tileInfo"></div>
+          </div>
+        </div>
+      </div>
+    </section>
   </div>
 
-  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <script src="client.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const menuPlayerNameInput = document.getElementById('menuPlayerNameInput');
+      const buttons = document.querySelectorAll('#btnNewWorld, #btnMultiplayer, #btnYourWorlds, #btnSettings');
+
+      function validatePlayerName() {
+        const name = menuPlayerNameInput.value.trim();
+        return name.length > 0;
+      }
+
+      function toggleButtons() {
+        const isValid = validatePlayerName();
+        buttons.forEach(button => button.disabled = !isValid);
+
+        if (!isValid) {
+          showNotification('Please enter your display name first.', 'warning', 0); // Notification stays until name is entered
+        }
+      }
+
+      menuPlayerNameInput.addEventListener('input', () => {
+        const isValid = validatePlayerName();
+        if (isValid) {
+          clearNotifications(); // Clear all notifications once the name is valid
+        }
+        toggleButtons();
+      });
+
+      // Initial validation on page load
+      toggleButtons();
+
+      // Open settings in-game
+      const openSettingsInGameBtn = document.getElementById('openSettingsInGameBtn');
+      if (openSettingsInGameBtn) {
+        openSettingsInGameBtn.addEventListener('click', () => {
+          // Explicitly set game as previous screen before showing settings
+          previousScreen = document.getElementById('game');
+          showScreen(document.getElementById('settingsScreen'), false);
+        });
+      }
+    });
+  </script>
 </body>
 </html>

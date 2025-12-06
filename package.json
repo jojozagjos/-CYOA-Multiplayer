@@ -1,17 +1,14 @@
 {
-  "name": "ai-story-lobby-game",
-  "version": "1.0.0",
-  "description": "Multiplayer story game with lobbies, voting, and simple procedural narrator for Render deployment.",
+  "name": "god-sim-world",
+  "version": "4.0.0",
+  "description": "Polished top-down multiplayer god simulator with menus, settings, player-created creatures, sounds, evolution, climate, and simple civilizations.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
-    "express": "^4.19.2",
-    "socket.io": "^4.8.1",
-    "cors": "^2.8.5"
-  },
-  "engines": {
-    "node": ">=18.x"
+    "express": "^4.19.0",
+    "socket.io": "^4.7.5",
+    "uuid": "^9.0.1"
   }
 }
