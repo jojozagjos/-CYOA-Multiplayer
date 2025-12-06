@@ -915,6 +915,45 @@ button:active:not(:disabled) {
   image-rendering: pixelated;
 }
 
+/* Ensure preview action buttons don't overflow the header */
+.preview-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.preview-actions button {
+  padding: 6px 10px;
+  font-size: 0.88rem;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* Align header text and action buttons consistently */
+.panel-header-actions > h3 {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  font-size: 1.05rem;
+  line-height: 1;
+}
+.panel-header-actions > div,
+.panel-header-actions .preview-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.panel-header-actions .preview-actions button,
+.panel-header-actions .refresh-btn,
+.panel-header-actions .import-btn {
+  padding: 6px 10px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 /* === GAME LAYOUT === */
 #topBar {
   position: fixed;
