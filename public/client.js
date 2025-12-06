@@ -48,6 +48,27 @@ function clampCamera() {
   cameraY = Math.max(minY - margin, Math.min(maxY + margin, cameraY));
 }
 
+// Prevent zooming out so far the world becomes tiny on screen
+function clampZoom() {
+  // Hard limits
+  const ABS_MIN = 0.05;
+  const ABS_MAX = 6;
+  if (!gameCanvas || !currentWorld) {
+    cameraZoom = Math.max(ABS_MIN, Math.min(ABS_MAX, cameraZoom));
+    return;
+  }
+
+  const size = currentWorld.size || worldSize;
+  const marginTiles = 2; // match clampCamera margin
+
+  // We want the visible width (gameCanvas.width / cameraZoom) to be at most
+  // worldWidth + 2*marginPixels. worldWidth in world-coordinates equals gameCanvas.width.
+  // Solve for cameraZoom: cameraZoom >= 1 / (1 + 2*marginTiles/size)
+  const minZoom = 1 / (1 + (2 * marginTiles) / Math.max(1, size));
+
+  cameraZoom = Math.max(minZoom, Math.min(ABS_MAX, cameraZoom));
+}
+
 // client-side settings
 const defaultSettings = {
   masterVolume: 1,
@@ -162,6 +183,8 @@ const zoomInBtn = document.getElementById('zoomInBtn');
 const zoomOutBtn = document.getElementById('zoomOutBtn');
 const resetCameraBtn = document.getElementById('resetCameraBtn');
 
+const copyJoinCodeBtn = document.getElementById('copyJoinCodeBtn');
+
 const toolbarCreatorBtn = document.getElementById('toolbarCreatorBtn');
 const creatorPanel = document.getElementById('creatorPanel');
 
@@ -173,6 +196,7 @@ const speedSelect = document.getElementById('speedSelect');
 // Game state
 let isPaused = false;
 let gameSpeed = 1;
+let lastSpeed = '1';
 
 // settings controls
 const settingMasterVolume = document.getElementById('settingMasterVolume');
@@ -588,7 +612,8 @@ function adjustInitialZoom() {
   const desiredTilePx = 10; // make tiles larger by default
   if (tilePx > 0) {
     const factor = desiredTilePx / tilePx;
-    cameraZoom = Math.max(0.25, Math.min(6, cameraZoom * factor));
+    cameraZoom = cameraZoom * factor;
+    clampZoom();
   }
   // center on world
   const tileW = gameCanvas.width / size;
@@ -864,6 +889,7 @@ resetCameraBtn.onclick = () => {
   cameraX = 0;
   cameraY = 0;
   cameraZoom = 1;
+  clampZoom();
   clampCamera();
 };
 
@@ -877,7 +903,8 @@ function zoomAt(clientX, clientY, factor) {
   const worldY = mouseY / cameraZoom + cameraY;
 
   // Apply factor and clamp
-  cameraZoom = Math.max(0.25, Math.min(6, cameraZoom * factor));
+  cameraZoom = cameraZoom * factor;
+  clampZoom();
 
   // Adjust camera so the same world point remains under the mouse
   cameraX = worldX - (mouseX / cameraZoom);
@@ -890,12 +917,36 @@ if (pauseBtn) {
   pauseBtn.onclick = () => {
     isPaused = !isPaused;
     pauseBtn.textContent = isPaused ? '▶️ Resume' : '⏸️ Pause';
+    if (isPaused) {
+      try { lastSpeed = speedSelect.value || lastSpeed; } catch (e) {}
+      if (speedSelect) {
+        speedSelect.value = '0';
+        speedSelect.disabled = true;
+      }
+    } else {
+      if (speedSelect) {
+        speedSelect.disabled = false;
+        speedSelect.value = lastSpeed || '1';
+        gameSpeed = parseFloat(speedSelect.value) || 1;
+      }
+    }
   };
 }
 
 if (speedSelect) {
   speedSelect.addEventListener('change', () => {
-    gameSpeed = parseFloat(speedSelect.value) || 1;
+    const val = speedSelect.value;
+    if (val === '0') {
+      isPaused = true;
+      pauseBtn.textContent = '▶️ Resume';
+      speedSelect.disabled = true;
+    } else {
+      isPaused = false;
+      pauseBtn.textContent = '⏸️ Pause';
+      speedSelect.disabled = false;
+      gameSpeed = parseFloat(val) || 1;
+      lastSpeed = val;
+    }
   });
 }
 
@@ -973,8 +1024,9 @@ gameCanvas.addEventListener('wheel', (e) => {
   
   // Update zoom
   const zoomDelta = e.deltaY > 0 ? 0.9 : 1.1;
-  cameraZoom = Math.max(0.25, Math.min(6, cameraZoom * zoomDelta));
-  
+  cameraZoom = cameraZoom * zoomDelta;
+  clampZoom();
+
   // Adjust camera to keep the world coords at mouse position
   cameraX = worldX - (mouseX / cameraZoom);
   cameraY = worldY - (mouseY / cameraZoom);
@@ -1322,3 +1374,17 @@ function updateTopBar() {
   powerRainBtn.disabled = !powers.includes('rainstorm');
   powerHeatwaveBtn.disabled = !powers.includes('heatwave');
 }
+  // Wire up copy-join-code button to copy the current world id
+  if (copyJoinCodeBtn) {
+    copyJoinCodeBtn.disabled = false;
+    copyJoinCodeBtn.onclick = async () => {
+      try {
+        const id = currentWorld && currentWorld.id ? currentWorld.id : '';
+        if (!id) throw new Error('No world id available');
+        await navigator.clipboard.writeText(id);
+        showNotification('Join code copied to clipboard.', 'success');
+      } catch (err) {
+        showNotification('Failed to copy join code: ' + (err.message || err), 'error');
+      }
+    };
+  }
