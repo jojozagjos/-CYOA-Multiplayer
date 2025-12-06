@@ -210,55 +210,6 @@ function createNewWorld(name, options = {}) {
   
   const tiles = generateWorld(seed, size, islandSize, climate);
   
-  // Create initial creature type
-  const initialTypeId = uuidv4();
-  const initialType = {
-    id: initialTypeId,
-    name: 'Primordial',
-    diet: 'herbivore',
-    size: 1,
-    speed: 1,
-    generation: 0,
-    parentTypeId: null,
-    evoScore: 0,
-    imageDataUrl: null,
-    soundDataUrl: null
-  };
-  
-  // Find a good spawn location (grass or forest)
-  let spawnX = size / 2;
-  let spawnY = size / 2;
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const tile = tiles[y][x];
-      if (tile.biome === 'grass' || tile.biome === 'forest') {
-        spawnX = x + 0.5;
-        spawnY = y + 0.5;
-        break;
-      }
-    }
-    if (spawnX !== size / 2) break;
-  }
-  
-  // Spawn initial creature
-  const initialCreature = {
-    id: uuidv4(),
-    typeId: initialTypeId,
-    x: spawnX,
-    y: spawnY,
-    vx: 0,
-    vy: 0,
-    targetX: null,
-    targetY: null,
-    hunger: 0.3,
-    age: 0,
-    health: 100,
-    generation: 0,
-    parentId: null,
-    parent2Id: null,
-    ownerSocketId: null
-  };
-  
   const world = {
     id,
     name,
@@ -267,8 +218,8 @@ function createNewWorld(name, options = {}) {
     islandSize,
     climate,
     tiles,
-    creatureTypes: { [initialTypeId]: initialType },
-    creatures: [initialCreature],
+    creatureTypes: {},
+    creatures: [],
     players: {},
     civilizations: [],
     time: 0,
@@ -513,7 +464,9 @@ io.on('connection', (socket) => {
       id,
       generation: creatureType.generation || 0,
       parentTypeId: creatureType.parentTypeId || null,
-      evoScore: 0
+      evoScore: 0,
+      spawnLimit: 10, // Maximum allowed spawns per species
+      spawned: 0 // Track how many have been manually spawned
     });
     world.creatureTypes[id] = type;
     world.updatedAt = Date.now();
@@ -536,6 +489,15 @@ io.on('connection', (socket) => {
       cb && cb({ ok: false, error: 'Creature type not found' });
       return;
     }
+    
+    // Check spawn limit
+    const spawned = type.spawned || 0;
+    const limit = type.spawnLimit || 10;
+    if (spawned >= limit) {
+      cb && cb({ ok: false, error: `Spawn limit reached (${limit}/${limit})` });
+      return;
+    }
+    
     const tileX = Math.max(0, Math.min(world.size - 1, Math.floor(x)));
     const tileY = Math.max(0, Math.min(world.size - 1, Math.floor(y)));
 
@@ -544,17 +506,25 @@ io.on('connection', (socket) => {
       typeId,
       x: tileX + 0.5,
       y: tileY + 0.5,
-      hunger: 0,
+      vx: 0,
+      vy: 0,
+      targetX: null,
+      targetY: null,
+      hunger: 0.1,
       age: 0,
+      health: 100,
       generation: 0,
+      parentId: null,
+      parent2Id: null,
       ownerSocketId: socket.id
     };
     world.creatures.push(instance);
+    type.spawned = spawned + 1;
     world.updatedAt = Date.now();
     saveWorldsToDisk();
     gainXp(world, socket.id, 5);
 
-    io.to(worldId).emit('creatureSpawned', { creature: instance });
+    io.to(worldId).emit('creatureSpawned', { creature: instance, type });
     cb && cb({ ok: true, creature: instance });
   });
 
@@ -780,7 +750,7 @@ function simulateWorld(world, dt) {
 
   for (let c of creatures) {
     c.age += dt;
-    c.hunger += 0.005 * dt;
+    c.hunger += 0.001 * dt; // Reduced from 0.005 to make them survive longer
     
     // Initialize velocity if not present
     if (c.vx === undefined) c.vx = 0;
@@ -799,9 +769,9 @@ function simulateWorld(world, dt) {
     let seeking = null;
     
     // Seek food if hungry
-    if (c.hunger > 0.4) {
+    if (c.hunger > 0.3) {
       let bestFood = 0;
-      const searchRadius = 8;
+      const searchRadius = 10; // Increased search radius
       
       for (let dy = -searchRadius; dy <= searchRadius; dy++) {
         for (let dx = -searchRadius; dx <= searchRadius; dx++) {
@@ -847,8 +817,8 @@ function simulateWorld(world, dt) {
     }
 
     // Smooth velocity-based movement
-    const moveSpeed = (type.speed || 1) * 0.015;
-    const friction = 0.85; // Smooth deceleration
+    const moveSpeed = (type.speed || 1) * 0.01; // Reduced for smoother movement
+    const friction = 0.92; // Higher friction for smoother deceleration
     
     if (targetX !== null && targetY !== null) {
       // Move towards target
@@ -869,10 +839,10 @@ function simulateWorld(world, dt) {
         c.targetY = null;
       }
     } else {
-      // Random wandering
-      if (Math.random() < 0.01 * dt) {
-        c.vx += (Math.random() - 0.5) * moveSpeed * dt;
-        c.vy += (Math.random() - 0.5) * moveSpeed * dt;
+      // Random wandering - more subtle
+      if (Math.random() < 0.005 * dt) {
+        c.vx += (Math.random() - 0.5) * moveSpeed * dt * 0.5;
+        c.vy += (Math.random() - 0.5) * moveSpeed * dt * 0.5;
       }
     }
     
@@ -899,16 +869,16 @@ function simulateWorld(world, dt) {
 
     // Eating behavior
     if (type.diet === 'herbivore' || type.diet === 'plant' || !type.diet) {
-      if (newTile.food > 0 && c.hunger > 0.2) {
-        const eatAmount = Math.min(newTile.food, 0.1 * dt);
+      if (newTile.food > 0 && c.hunger > 0.1) {
+        const eatAmount = Math.min(newTile.food, 0.15 * dt); // Increased eating rate
         newTile.food -= eatAmount;
-        c.hunger = Math.max(0, c.hunger - eatAmount * 2);
+        c.hunger = Math.max(0, c.hunger - eatAmount * 3); // More hunger reduction per food
         
-        // Consume vegetation
-        if (newTile.vegetation && Math.random() < 0.01 * dt) {
+        // Consume vegetation less aggressively
+        if (newTile.vegetation && Math.random() < 0.005 * dt) {
           if (newTile.vegetation === 'bush') {
-            newTile.food = Math.max(0, newTile.food - 2);
-            if (newTile.food < 2) newTile.vegetation = null;
+            newTile.food = Math.max(0, newTile.food - 1);
+            if (newTile.food < 1) newTile.vegetation = null;
           }
         }
       }
@@ -994,7 +964,8 @@ function simulateWorld(world, dt) {
     if (!typeStats[c.typeId]) typeStats[c.typeId] = { count: 0, births: 0 };
     typeStats[c.typeId].count += 1;
 
-    if (c.hunger > 3 || c.age > 1000) {
+    // Death conditions - much more lenient
+    if (c.hunger > 5 || c.age > 2000) {
       c.dead = true;
     }
   }

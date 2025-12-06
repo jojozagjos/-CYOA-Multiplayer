@@ -598,6 +598,7 @@ function joinWorld(worldId, playerName) {
 
     showScreen(gameEl);
     updateTopBar();
+    rebuildSpeciesList();
     initCreatureCanvas();
     // Ensure canvas matches container size and adjust zoom for visibility
     resizeGameCanvas();
@@ -839,11 +840,36 @@ createCreatureTypeBtn.onclick = () => {
     }
     const type = res.type;
     creatureTypes[type.id] = type;
+    rebuildSpeciesList();
     creatureSoundDataUrl = null;
     recordingStatus.textContent = 'No sound recorded';
     showNotification(`Species "${name}" created!`, 'success');
   });
 };
+
+// Rebuild species list with spawn limits
+function rebuildSpeciesList() {
+  speciesListEl.innerHTML = '';
+  Object.values(creatureTypes).forEach(type => {
+    const li = document.createElement('li');
+    const spawned = type.spawned || 0;
+    const limit = type.spawnLimit || 10;
+    const remaining = limit - spawned;
+    const limitText = remaining > 0 ? ` (${remaining}/${limit} left)` : ' (LIMIT REACHED)';
+    li.textContent = type.name + ' [' + (type.diet || '?') + ']' + limitText;
+    li.style.opacity = remaining > 0 ? '1' : '0.5';
+    li.onclick = () => {
+      if (remaining <= 0) {
+        showNotification('Spawn limit reached for this species', 'warning');
+        return;
+      }
+      selectedSpeciesId = type.id;
+      Array.from(speciesListEl.children).forEach(c => c.classList.remove('selected'));
+      li.classList.add('selected');
+    };
+    speciesListEl.appendChild(li);
+  });
+}
 
 // Hybrid image generation - blend two parent images
 function generateHybridImage(parent1Type, parent2Type, hybridType) {
@@ -1663,7 +1689,12 @@ function drawWorld() {
 
     if (!type._imageObj) {
       const img = new Image();
-      img.src = type.imageDataUrl;
+      if (type.imageDataUrl) {
+        img.src = type.imageDataUrl;
+        img.onerror = () => {
+          console.warn('Failed to load creature image for', type.name);
+        };
+      }
       type._imageObj = img;
     }
     const img = type._imageObj;
@@ -1741,6 +1772,7 @@ function updateCreatureCount() {
 socket.on('creatureTypeCreated', (data) => {
   const type = data.type;
   creatureTypes[type.id] = type;
+  rebuildSpeciesList();
   
   // Generate hybrid image if needed
   if (data.needsHybridImage && data.parent1 && data.parent2) {
@@ -1751,6 +1783,11 @@ socket.on('creatureTypeCreated', (data) => {
 socket.on('creatureSpawned', (data) => {
   creatures.push(data.creature);
   updateCreatureCount();
+  // Update spawned count if type info provided
+  if (data.type && creatureTypes[data.type.id]) {
+    creatureTypes[data.type.id].spawned = data.type.spawned;
+    rebuildSpeciesList();
+  }
 });
 
 socket.on('worldUpdate', (data) => {
