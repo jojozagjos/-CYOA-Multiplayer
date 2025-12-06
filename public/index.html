@@ -413,6 +413,9 @@
   </div>
 
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <!-- Load simulation modules before main client script -->
+  <script src="js/audio.js"></script>
+  <script src="js/animation.js"></script>
   <script src="client.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', () => {

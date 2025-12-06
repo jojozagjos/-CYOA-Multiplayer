@@ -6,6 +6,13 @@ const fs = require('fs');
 const { Server } = require('socket.io');
 const { v4: uuidv4 } = require('uuid');
 
+// Import simulation modules
+const { initializeNeeds, evaluateNeeds } = require('./simulation/needs');
+const { selectState, applyStateEffects, STATES } = require('./simulation/behaviors');
+const { updateMovement, initializeVelocity } = require('./simulation/movement');
+const { updateEnvironment } = require('./simulation/environment');
+const { updateLifecycle, attemptReproduction, checkDeath } = require('./simulation/lifecycle');
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
@@ -712,267 +719,117 @@ function cloneCreatureType(baseType) {
 }
 
 function simulateWorld(world, dt) {
+  if (!world || !world.tiles || !world.creatures) return;
+  
+  const events = [];
   const size = world.size;
   const tiles = world.tiles;
   const creatures = world.creatures;
   const types = world.creatureTypes;
 
-  world.time = (world.time || 0) + dt;
-  const season = Math.sin(world.time * 0.001);
-
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const tile = tiles[y][x];
-      tile.temp = tile.tempBase + season * 5;
-      tile.moist = Math.max(0, Math.min(1, tile.moistBase + season * 0.1));
-      
-      if (tile.biome !== 'water' && tile.biome !== 'mountain') {
-        const regenRate = 0.01 * dt * (0.5 + tile.moist);
-        tile.food = Math.min((tile.food || 0) + regenRate, 30);
-        
-        // Vegetation growth
-        if (!tile.vegetation && tile.food > 10) {
-          if (tile.biome === 'grass' && Math.random() < 0.0001 * dt) {
-            tile.vegetation = Math.random() < 0.3 ? 'bush' : null;
-          } else if (tile.biome === 'forest' && Math.random() < 0.0002 * dt) {
-            tile.vegetation = Math.random() < 0.7 ? 'tree' : 'bush';
-          }
-          
-          // Add food when vegetation grows
-          if (tile.vegetation === 'bush') tile.food += 3;
-          if (tile.vegetation === 'tree') tile.food += 5;
-        }
-      }
-    }
-  }
-
+  // Update environment (tiles, weather, seasons)
+  const envData = updateEnvironment(world, dt);
+  
   const typeStats = {};
 
   for (let c of creatures) {
-    c.age += dt;
-    c.hunger += 0.001 * dt; // Reduced from 0.005 to make them survive longer
-    
-    // Initialize velocity if not present
-    if (c.vx === undefined) c.vx = 0;
-    if (c.vy === undefined) c.vy = 0;
-
     const type = types[c.typeId];
     if (!type) continue;
 
+    // Initialize creature systems
+    initializeVelocity(c);
+    initializeNeeds(c, type);
+    
+    // Decrease reproduction cooldown
+    if (c.reproductionCooldown === undefined) c.reproductionCooldown = 0;
+    if (c.reproductionCooldown > 0) {
+      c.reproductionCooldown = Math.max(0, c.reproductionCooldown - dt);
+    }
+
+    // Get current tile
     const tx = Math.max(0, Math.min(size - 1, Math.floor(c.x)));
     const ty = Math.max(0, Math.min(size - 1, Math.floor(c.y)));
     const tile = tiles[ty][tx];
+    c.currentTile = tile;
 
-    // AI: Seek food when hungry, or seek mates
-    let targetX = c.targetX;
-    let targetY = c.targetY;
-    let seeking = null;
-    
-    // Seek food if hungry
-    if (c.hunger > 0.3) {
-      let bestFood = 0;
-      const searchRadius = 10; // Increased search radius
-      
-      for (let dy = -searchRadius; dy <= searchRadius; dy++) {
-        for (let dx = -searchRadius; dx <= searchRadius; dx++) {
-          const checkX = Math.max(0, Math.min(size - 1, tx + dx));
-          const checkY = Math.max(0, Math.min(size - 1, ty + dy));
-          const checkTile = tiles[checkY][checkX];
-          
-          if (checkTile.food > bestFood && checkTile.food > 2) {
-            bestFood = checkTile.food;
-            targetX = checkX + 0.5;
-            targetY = checkY + 0.5;
-            seeking = 'food';
-          }
-        }
-      }
-    }
-    
-    // Seek mates if well-fed
-    if (!seeking && c.hunger < 0.5 && c.age > 30 && c.age < 400) {
-      let closestMate = null;
-      let closestDist = 10;
-      
-      for (const other of creatures) {
-        if (other.id === c.id) continue;
-        if (other.age < 30 || other.age > 400) continue;
-        if (other.hunger > 0.6) continue;
-        
-        const dx = other.x - c.x;
-        const dy = other.y - c.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        
-        if (dist < closestDist) {
-          closestDist = dist;
-          closestMate = other;
-        }
-      }
-      
-      if (closestMate) {
-        targetX = closestMate.x;
-        targetY = closestMate.y;
-        seeking = 'mate';
-      }
+    // Update lifecycle (aging, growth stages)
+    updateLifecycle(c, type, dt);
+
+    // Evaluate needs and get urgencies
+    const urgencies = evaluateNeeds(c, type, tile, creatures, world, dt);
+
+    // Select behavior state based on urgencies
+    const stateResult = selectState(c, type, urgencies, world);
+    if (stateResult && stateResult.events) {
+      events.push(...stateResult.events);
     }
 
-    // Smooth velocity-based movement
-    const moveSpeed = (type.speed || 1) * 0.01; // Reduced for smoother movement
-    const friction = 0.92; // Higher friction for smoother deceleration
-    
-    if (targetX !== null && targetY !== null) {
-      // Move towards target
-      const dirX = targetX - c.x;
-      const dirY = targetY - c.y;
-      const dist = Math.sqrt(dirX * dirX + dirY * dirY);
-      
-      if (dist > 0.1) {
-        const accelX = (dirX / dist) * moveSpeed * dt;
-        const accelY = (dirY / dist) * moveSpeed * dt;
-        c.vx += accelX;
-        c.vy += accelY;
-        c.targetX = targetX;
-        c.targetY = targetY;
-      } else {
-        // Reached target
-        c.targetX = null;
-        c.targetY = null;
-      }
-    } else {
-      // Random wandering - more subtle
-      if (Math.random() < 0.005 * dt) {
-        c.vx += (Math.random() - 0.5) * moveSpeed * dt * 0.5;
-        c.vy += (Math.random() - 0.5) * moveSpeed * dt * 0.5;
-      }
+    // Apply state-specific effects
+    const stateEffects = applyStateEffects(c, type, dt);
+    if (stateEffects && Array.isArray(stateEffects)) {
+      events.push(...stateEffects);
     }
-    
-    // Apply friction
-    c.vx *= Math.pow(friction, dt);
-    c.vy *= Math.pow(friction, dt);
-    
-    // Limit speed
-    const maxSpeed = moveSpeed * 2;
-    const speed = Math.sqrt(c.vx * c.vx + c.vy * c.vy);
-    if (speed > maxSpeed) {
-      c.vx = (c.vx / speed) * maxSpeed;
-      c.vy = (c.vy / speed) * maxSpeed;
-    }
-    
-    // Update position
-    c.x = Math.max(0, Math.min(size - 0.001, c.x + c.vx * dt));
-    c.y = Math.max(0, Math.min(size - 0.001, c.y + c.vy * dt));
+
+    // Update hunger
+    c.hunger += 0.001 * dt;
+
+    // Update movement with modular system
+    updateMovement(c, type, world, dt);
 
     // Update tile position after movement
     const newTx = Math.max(0, Math.min(size - 1, Math.floor(c.x)));
     const newTy = Math.max(0, Math.min(size - 1, Math.floor(c.y)));
-    const newTile = tiles[newTy][newTx];
+    const currentTile = tiles[newTy][newTx];
+    c.currentTile = currentTile;
 
     // Eating behavior
-    if (type.diet === 'herbivore' || type.diet === 'plant' || !type.diet) {
-      if (newTile.food > 0 && c.hunger > 0.1) {
-        const eatAmount = Math.min(newTile.food, 0.15 * dt); // Increased eating rate
-        newTile.food -= eatAmount;
-        c.hunger = Math.max(0, c.hunger - eatAmount * 3); // More hunger reduction per food
+    if ((c.state === STATES.EAT || c.state === STATES.SEEK_FOOD) && currentTile.food > 0 && c.hunger > 0.1) {
+      if (type.diet === 'herbivore' || type.diet === 'plant' || !type.diet) {
+        const eatAmount = Math.min(currentTile.food, 0.15 * dt);
+        currentTile.food -= eatAmount;
+        c.hunger = Math.max(0, c.hunger - eatAmount * 3);
+        c.atFood = true;
+        
+        // Emit eating sound occasionally
+        if (Math.random() < 0.01 * dt) {
+          events.push({ creatureId: c.id, type: 'sound', sound: 'feeding' });
+        }
         
         // Consume vegetation less aggressively
-        if (newTile.vegetation && Math.random() < 0.005 * dt) {
-          if (newTile.vegetation === 'bush') {
-            newTile.food = Math.max(0, newTile.food - 1);
-            if (newTile.food < 1) newTile.vegetation = null;
+        if (currentTile.vegetation && Math.random() < 0.005 * dt) {
+          if (currentTile.vegetation === 'bush') {
+            currentTile.food = Math.max(0, currentTile.food - 1);
+            if (currentTile.food < 1) currentTile.vegetation = null;
           }
         }
       }
+    } else {
+      c.atFood = false;
     }
 
-    // Reproduction - check for nearby mates
-    if (c.hunger < 0.5 && c.age > 30 && c.age < 400) {
-      // Find nearby potential mates
-      for (const mate of creatures) {
-        if (mate.id === c.id) continue;
-        if (mate.age < 30 || mate.age > 400) continue;
-        if (mate.hunger > 0.6) continue;
-        
-        const dx = mate.x - c.x;
-        const dy = mate.y - c.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        
-        // If close enough, reproduce
-        if (dist < 0.5 && Math.random() < 0.001 * dt) {
-          const parent1Type = types[c.typeId];
-          const parent2Type = types[mate.typeId];
-          
-          let babyTypeId = c.typeId;
-          let isHybrid = false;
-          
-          // Check if parents are different species
-          if (c.typeId !== mate.typeId && parent1Type && parent2Type) {
-            // Create hybrid type
-            isHybrid = true;
-            const hybridId = uuidv4();
-            const hybridType = {
-              id: hybridId,
-              name: `${parent1Type.name}-${parent2Type.name} Hybrid`,
-              diet: parent1Type.diet, // Inherit from first parent
-              size: (parent1Type.size + parent2Type.size) / 2,
-              speed: (parent1Type.speed + parent2Type.speed) / 2,
-              generation: Math.max(parent1Type.generation, parent2Type.generation) + 1,
-              parentTypeId: parent1Type.id,
-              parent2TypeId: parent2Type.id,
-              evoScore: 0,
-              imageDataUrl: null, // Will be generated on client
-              soundDataUrl: null,
-              isHybrid: true
-            };
-            types[hybridId] = hybridType;
-            babyTypeId = hybridId;
-            
-            // Emit new type to all clients
-            io.to(world.id).emit('creatureTypeCreated', { type: hybridType, needsHybridImage: true, parent1: parent1Type, parent2: parent2Type });
-          }
-          
-          const baby = {
-            id: uuidv4(),
-            typeId: babyTypeId,
-            x: Math.max(0, Math.min(size - 0.001, c.x + (Math.random() - 0.5) * 0.5)),
-            y: Math.max(0, Math.min(size - 0.001, c.y + (Math.random() - 0.5) * 0.5)),
-            vx: 0,
-            vy: 0,
-            targetX: null,
-            targetY: null,
-            hunger: 0.2,
-            age: 0,
-            health: 100,
-            generation: Math.max(c.generation || 0, mate.generation || 0) + 1,
-            parentId: c.id,
-            parent2Id: mate.id,
-            ownerSocketId: c.ownerSocketId
-          };
-          creatures.push(baby);
-          
-          if (!typeStats[babyTypeId]) typeStats[babyTypeId] = { count: 0, births: 0 };
-          typeStats[babyTypeId].births += 1;
-          
-          // Increase hunger after reproduction
-          c.hunger += 0.2;
-          mate.hunger += 0.2;
-          
-          break; // Only one baby per cycle
-        }
-      }
-    }
-
+    // Track stats for evolution
     if (!typeStats[c.typeId]) typeStats[c.typeId] = { count: 0, births: 0 };
     typeStats[c.typeId].count += 1;
 
-    // Death conditions - much more lenient
-    if (c.hunger > 5 || c.age > 2000) {
-      c.dead = true;
+    // Check death conditions using lifecycle module
+    const deathCheck = checkDeath(c, type);
+    if (deathCheck.died) {
+      events.push({ creatureId: c.id, type: 'death', cause: deathCheck.cause });
     }
   }
 
   for (let i = creatures.length - 1; i >= 0; i--) {
     if (creatures[i].dead) {
       creatures.splice(i, 1);
+    }
+  }
+
+  // After updating creatures, emit collected events to clients so they can play sounds/animate
+  if (events && events.length > 0) {
+    try {
+      io.to(world.id).emit('creatureEvents', events);
+    } catch (e) {
+      // ignore emit failures
     }
   }
 

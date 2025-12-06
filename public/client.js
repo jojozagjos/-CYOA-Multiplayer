@@ -10,6 +10,8 @@ let selectedCreature = null;
 let currentPower = null;
 let worldSize = 64;
 let viewMode = 'biome';
+// When true the client is in "spawn mode" — next canvas click will attempt to spawn selected species
+let spawnMode = false;
 
 // Camera controls
 let cameraX = 0;
@@ -88,6 +90,10 @@ function loadSettings() {
     if (!raw) return;
     const parsed = JSON.parse(raw);
     settings = { ...defaultSettings, ...parsed };
+    // Sync with audio manager
+    if (typeof audioManager !== 'undefined') {
+      audioManager.setSettings(settings);
+    }
   } catch (e) {
     console.warn('Failed to load settings', e);
   }
@@ -96,6 +102,10 @@ function loadSettings() {
 function saveSettings() {
   try {
     localStorage.setItem('godSimSettings', JSON.stringify(settings));
+    // Sync with audio manager
+    if (typeof audioManager !== 'undefined') {
+      audioManager.setSettings(settings);
+    }
   } catch (e) {
     console.warn('Failed to save settings', e);
   }
@@ -734,9 +744,6 @@ creatureCanvas.addEventListener('mouseleave', () => {
 
 clearCreatureCanvasBtn.onclick = () => initCreatureCanvas();
 
-// Initialize canvas on page load
-initCreatureCanvas();
-
 creatureImageUpload.addEventListener('change', (e) => {
   const file = e.target.files[0];
   if (!file) return;
@@ -751,7 +758,7 @@ creatureImageUpload.addEventListener('change', (e) => {
       const x = (creatureCanvas.width - w) / 2;
       const y = (creatureCanvas.height - h) / 2;
       // Draw the uploaded image as a preview (disable smoothing for pixel art clarity)
-      try { creatureCtx.imageSmoothingEnabled = false; } catch (e) {}
+      try { creatureCtx.imageSmoothingEnabled = false; } catch (err) {}
       creatureCtx.drawImage(img, x, y, w, h);
       // When an image is uploaded, disable the freehand drawing option and mark preview state
       creatureImageLoaded = true;
@@ -863,9 +870,13 @@ function rebuildSpeciesList() {
         showNotification('Spawn limit reached for this species', 'warning');
         return;
       }
+      // Enter spawn mode for this species: next canvas click will spawn
       selectedSpeciesId = type.id;
+      spawnMode = true;
       Array.from(speciesListEl.children).forEach(c => c.classList.remove('selected'));
       li.classList.add('selected');
+      document.body.style.cursor = 'crosshair';
+      showNotification(`Spawn mode: click the world to spawn ${type.name} (Esc to cancel)`, 'info', 3000);
     };
     speciesListEl.appendChild(li);
   });
@@ -1254,20 +1265,35 @@ setView('biome');
 // --- game canvas interaction ---
 
 let isDragging = false;
+let mouseDownX = 0;
+let mouseDownY = 0;
 let lastMouseX = 0;
 let lastMouseY = 0;
 let mouseCanvasX = 0;
 let mouseCanvasY = 0;
+const DRAG_THRESHOLD = 5; // pixels movement before considering it a drag
 
 gameCanvas.addEventListener('mousedown', (e) => {
   if (e.button === 0) { // left click
+    mouseDownX = e.clientX;
+    mouseDownY = e.clientY;
     lastMouseX = e.clientX;
     lastMouseY = e.clientY;
-    isDragging = true;
+    isDragging = false; // Don't set to true yet, wait for movement
   }
 });
 
 gameCanvas.addEventListener('mousemove', (e) => {
+  // Check if we should start dragging (mouse moved enough)
+  if (!isDragging && e.buttons === 1) {
+    const dx = e.clientX - mouseDownX;
+    const dy = e.clientY - mouseDownY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist > DRAG_THRESHOLD) {
+      isDragging = true;
+    }
+  }
+  
   if (isDragging) {
     const dx = e.clientX - lastMouseX;
     const dy = e.clientY - lastMouseY;
@@ -1321,8 +1347,27 @@ gameCanvas.addEventListener('wheel', (e) => {
   clampCamera();
 });
 
+// Escape key cancels spawn mode
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && spawnMode) {
+    spawnMode = false;
+    selectedSpeciesId = null;
+    document.body.style.cursor = '';
+    // Deselect all species in list
+    Array.from(speciesListEl.children).forEach(c => c.classList.remove('selected'));
+    showNotification('Spawn mode cancelled', 'info', 1500);
+  }
+});
+
 gameCanvas.addEventListener('click', (e) => {
   if (!currentWorld) return;
+  
+  // Ignore clicks that were actually drags
+  if (isDragging) {
+    isDragging = false;
+    return;
+  }
+  
   const rect = gameCanvas.getBoundingClientRect();
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
@@ -1351,9 +1396,18 @@ gameCanvas.addEventListener('click', (e) => {
   }
   
   if (clickedCreature) {
-    selectedCreature = clickedCreature;
-    updateCreatureInfo(clickedCreature);
-    drawFamilyTree(clickedCreature);
+    // Use the freshest instance from `creatures` array (in case of stale references)
+    const fresh = creatures.find(x => x.id === clickedCreature.id) || clickedCreature;
+    selectedCreature = fresh;
+    updateCreatureInfo(fresh);
+    drawFamilyTree(fresh);
+    // If we were in spawn mode, cancel it when clicking a creature
+    if (spawnMode) {
+      spawnMode = false;
+      selectedSpeciesId = null;
+      document.body.style.cursor = '';
+      Array.from(speciesListEl.children).forEach(c => c.classList.remove('selected'));
+    }
     drawWorld(); // Redraw to show selection highlight
     return;
   }
@@ -1361,6 +1415,28 @@ gameCanvas.addEventListener('click', (e) => {
   // Enforce world border - don't allow interactions outside world bounds
   if (tileX < 0 || tileY < 0 || tileX >= worldSize || tileY >= worldSize) {
     showNotification('Cannot interact outside world border!', 'warning', 2000);
+    return;
+  }
+
+  // If we're in spawn mode and have a selected species, spawn there
+  if (spawnMode && selectedSpeciesId) {
+    socket.emit('spawnCreature', {
+      worldId: currentWorld.id,
+      typeId: selectedSpeciesId,
+      x: tileX,
+      y: tileY
+    }, (res) => {
+      if (!res.ok) {
+        showNotification(res.error || 'Failed to spawn', 'error');
+      } else {
+        showNotification('Creature spawned!', 'success', 1500);
+      }
+      // Exit spawn mode after attempt
+      spawnMode = false;
+      selectedSpeciesId = null;
+      document.body.style.cursor = '';
+      Array.from(speciesListEl.children).forEach(c => c.classList.remove('selected'));
+    });
     return;
   }
 
@@ -1375,7 +1451,17 @@ gameCanvas.addEventListener('click', (e) => {
     return;
   }
 
-  // Removed spawn creature functionality
+  // If we reach here, the click wasn't on a creature, spawn, or power — clear selection
+  if (selectedCreature) {
+    selectedCreature = null;
+    updateCreatureInfo(null);
+    const canvas = document.getElementById('familyTreeCanvas');
+    const emptyMsg = document.getElementById('familyTreeEmpty');
+    if (canvas) canvas.style.display = 'none';
+    if (emptyMsg) emptyMsg.style.display = 'block';
+    drawWorld();
+  }
+
   updateTileInfo(tileX, tileY);
 });
 
@@ -1669,22 +1755,43 @@ function drawWorld() {
 
   for (const c of creatures) {
     const type = creatureTypes[c.typeId];
-    if (!type) continue;
-    const cx = c.x * (gameCanvas.width / size);
-    const cy = c.y * (gameCanvas.height / size);
-    const baseSize = (type.size || 1) * 8;
-    const drawSize = settings.reduceEffects ? baseSize : baseSize + Math.sin(performance.now() / 300 + (c.id && c.id.toString().length)) * 0.5;
+    if (!type || !c) continue;
+    
+    let cx, cy, drawSize;
+    
+    // Update animation state
+    if (typeof animationManager !== 'undefined') {
+      const anim = animationManager.updateCreature(c, 16); // ~16ms per frame at 60fps
+      
+      // Get smooth lerped position
+      const pos = animationManager.getLerpedPosition(c, size, gameCanvas.width, gameCanvas.height);
+      cx = pos.x;
+      cy = pos.y;
+      
+      // Get size with life stage multiplier
+      const sizeMultiplier = animationManager.getSizeMultiplier(c);
+      const baseSize = (type.size || 1) * 8 * sizeMultiplier;
+      drawSize = baseSize;
 
-    // Calculate rotation based on velocity
-    const vx = c.vx || 0;
-    const vy = c.vy || 0;
-    const rotation = Math.atan2(vy, vx);
-    const hasVelocity = Math.abs(vx) > 0.001 || Math.abs(vy) > 0.001;
+      // Get smooth walking/swimming rotation
+      const walkRotation = animationManager.getWalkRotation(c, type);
+      
+      // Get idle animation offsets
+      const idleAnim = animationManager.getIdleAnimation(c, type);
 
-    gameCtx.save();
-    gameCtx.translate(cx, cy);
-    if (hasVelocity) {
-      gameCtx.rotate(rotation);
+      gameCtx.save();
+      gameCtx.translate(cx + idleAnim.offsetX, cy + idleAnim.offsetY);
+      gameCtx.rotate(walkRotation);
+      gameCtx.scale(idleAnim.scale, idleAnim.scale);
+    } else {
+      // Fallback if animationManager not loaded
+      cx = c.x * (gameCanvas.width / size);
+      cy = c.y * (gameCanvas.height / size);
+      const baseSize = (type.size || 1) * 8;
+      drawSize = baseSize;
+      
+      gameCtx.save();
+      gameCtx.translate(cx, cy);
     }
 
     if (!type._imageObj) {
@@ -1707,13 +1814,11 @@ function drawWorld() {
       gameCtx.arc(0, 0, drawSize/2, 0, Math.PI * 2);
       gameCtx.fill();
       
-      // Direction indicator
-      if (hasVelocity) {
-        gameCtx.fillStyle = '#fff';
-        gameCtx.beginPath();
-        gameCtx.arc(drawSize/3, 0, drawSize/6, 0, Math.PI * 2);
-        gameCtx.fill();
-      }
+      // Direction indicator (always points right)
+      gameCtx.fillStyle = '#fff';
+      gameCtx.beginPath();
+      gameCtx.arc(drawSize/3, 0, drawSize/6, 0, Math.PI * 2);
+      gameCtx.fill();
     }
     
     // Draw selection highlight if selected
@@ -1754,11 +1859,30 @@ function maybePlayCreatureSounds() {
   }
 }
 
+// Track last cleanup time
+let lastCleanupTime = 0;
+
 function loop() {
   drawWorld();
   updateCreatureCount();
+  
+  // Periodic cleanup every 5 seconds
+  const now = performance.now();
+  if (now - lastCleanupTime > 5000) {
+    lastCleanupTime = now;
+    
+    if (typeof audioManager !== 'undefined') {
+      audioManager.cleanup();
+    }
+    if (typeof animationManager !== 'undefined' && creatures) {
+      const activeIds = creatures.map(c => c.id);
+      animationManager.cleanup(activeIds);
+    }
+  }
+  
   requestAnimationFrame(loop);
 }
+lastCleanupTime = performance.now();
 loop();
 
 function updateCreatureCount() {
@@ -1801,6 +1925,8 @@ socket.on('worldUpdate', (data) => {
     if (stillExists) {
       selectedCreature = stillExists;
       updateCreatureInfo(stillExists);
+      // Keep the family tree view in sync with the latest creature data
+      drawFamilyTree(stillExists);
     } else {
       selectedCreature = null;
       updateCreatureInfo(null);
@@ -1830,6 +1956,28 @@ socket.on('playerUpdate', (data) => {
 socket.on('playersListUpdated', (data) => {
   const players = data.players || [];
   renderPlayersList(players);
+});
+
+// Handle server-emitted creature events (state changes, sound cues)
+socket.on('creatureEvents', (events) => {
+  try {
+    if (!events || !Array.isArray(events)) return;
+    if (typeof audioManager === 'undefined') return;
+    if (!currentWorld) return;
+    
+    // Use audio manager to handle events with spatial sound
+    const camera = {
+      x: cameraX,
+      y: cameraY,
+      zoom: cameraZoom,
+      canvasWidth: gameCanvas.width,
+      canvasHeight: gameCanvas.height
+    };
+    
+    audioManager.handleCreatureEvents(events, creatures, creatureTypes, camera, currentWorld.size);
+  } catch (e) {
+    console.error('Error handling creature events:', e);
+  }
 });
 
 function renderPlayersList(players) {
