@@ -111,9 +111,9 @@
               <span>World Size</span>
             </label>
             <select id="worldSizeSelect" class="modern-input">
-              <option value="48">Small (48x48)</option>
-              <option value="64" selected>Medium (64x64)</option>
-              <option value="96">Large (96x96)</option>
+              <option value="64">Small (64x64)</option>
+              <option value="96" selected>Medium (96x96)</option>
+              <option value="128">Large (128x128)</option>
             </select>
           </div>
           <div class="form-card">
@@ -200,7 +200,11 @@
             <div class="panel interactive-panel">
               <div class="panel-header-actions">
                 <h3>All Worlds</h3>
-                <button id="refreshWorldsBtn" class="refresh-btn">🔄 Refresh</button>
+                <div style="display:flex; gap:8px; align-items:center;">
+                  <button id="refreshWorldsBtn" class="refresh-btn">🔄 Refresh</button>
+                  <button id="importWorldBtn" class="import-btn">📥 Import</button>
+                  <input id="importWorldFile" type="file" accept="application/json" style="display:none">
+                </div>
               </div>
               <ul id="worldList" class="world-list"></ul>
               <p class="hint">💡 Click a world to preview. Right-click to delete.</p>
@@ -211,6 +215,7 @@
                 <div class="preview-actions">
                   <button id="enterWorldBtn" class="primary" disabled>Enter World</button>
                   <button id="copyWorldIdBtn" disabled>Copy ID</button>
+                  <button id="exportWorldBtn" disabled>Export</button>
                 </div>
               </div>
               <div id="worldPreviewInfo" class="preview-info">Select a world to see details.</div>

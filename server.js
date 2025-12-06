@@ -280,6 +280,8 @@ function gainXp(world, socketId, amount) {
 // --- Express static files ---
 
 app.use(express.static(path.join(__dirname, 'public')));
+// Parse JSON bodies for API endpoints (import)
+app.use(express.json({ limit: '5mb' }));
 
 app.get('/api/worlds', (req, res) => {
   const summary = Object.values(worlds).map(w => ({
@@ -289,6 +291,86 @@ app.get('/api/worlds', (req, res) => {
     updatedAt: w.updatedAt
   }));
   res.json(summary);
+});
+
+// Export a single world as compact JSON (sanitized for portability)
+app.get('/api/worlds/:worldId/export', (req, res) => {
+  const worldId = req.params.worldId;
+  const world = worlds[worldId];
+  if (!world) return res.status(404).json({ ok: false, error: 'World not found' });
+
+  // Deep-copy and sanitize
+  const copy = {
+    id: world.id,
+    name: world.name,
+    seed: world.seed,
+    size: world.size,
+    islandSize: world.islandSize,
+    climate: world.climate,
+    tiles: world.tiles,
+    creatureTypes: world.creatureTypes,
+    creatures: (world.creatures || []).map(c => {
+      const cc = Object.assign({}, c);
+      // Remove runtime-only fields
+      delete cc.ownerSocketId;
+      delete cc.dead;
+      return cc;
+    }),
+    civilizations: world.civilizations || [],
+    time: world.time || 0,
+    createdAt: world.createdAt,
+    updatedAt: world.updatedAt
+  };
+
+  res.setHeader('Content-Disposition', `attachment; filename="world-${worldId}.json"`);
+  res.setHeader('Content-Type', 'application/json');
+  res.send(JSON.stringify(copy));
+});
+
+// Import a world JSON payload and create a new world entry
+app.post('/api/worlds/import', (req, res) => {
+  const payload = req.body;
+  if (!payload || !payload.tiles || !payload.size) {
+    return res.status(400).json({ ok: false, error: 'Invalid world payload' });
+  }
+
+  try {
+    const newId = uuidv4();
+    const now = Date.now();
+    const world = {
+      id: newId,
+      name: payload.name || (`Imported World ${newId.slice(0,8)}`),
+      seed: payload.seed || Math.floor(Math.random() * 1e9),
+      size: payload.size,
+      islandSize: payload.islandSize || (payload.islandSize === 0 ? 0 : 50),
+      climate: payload.climate || 'temperate',
+      tiles: payload.tiles,
+      creatureTypes: payload.creatureTypes || {},
+      creatures: (payload.creatures || []).map(c => {
+        const cc = Object.assign({}, c);
+        // Imported creatures shouldn't carry owner socket IDs
+        delete cc.ownerSocketId;
+        return cc;
+      }),
+      civilizations: payload.civilizations || [],
+      players: {},
+      time: payload.time || 0,
+      createdAt: now,
+      updatedAt: now
+    };
+
+    // Basic validation: tiles dimensions
+    if (!Array.isArray(world.tiles) || world.tiles.length !== world.size) {
+      return res.status(400).json({ ok: false, error: 'Tiles array size mismatch' });
+    }
+
+    worlds[newId] = world;
+    saveWorldsToDisk();
+    return res.json({ ok: true, worldId: newId });
+  } catch (e) {
+    console.error('Import failed', e);
+    return res.status(500).json({ ok: false, error: 'Import failed' });
+  }
 });
 
 app.delete('/api/worlds/:worldId', (req, res) => {
@@ -583,7 +665,8 @@ io.on('connection', (socket) => {
         colors[y * size + x] = c;
       }
     }
-    cb && cb({ ok: true, preview: { size, colors } });
+    const creatureCount = (world.creatures || []).length;
+    cb && cb({ ok: true, preview: { size, colors, seed: world.seed, islandSize: world.islandSize, climate: world.climate, creatureCount } });
   });
 });
 

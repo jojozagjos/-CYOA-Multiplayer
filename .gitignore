@@ -1,0 +1,7 @@
+/# Ignore saved worlds to avoid overwriting live data
+data/worlds.json
+
+/# Node modules
+node_modules/
+
+/.DS_Store

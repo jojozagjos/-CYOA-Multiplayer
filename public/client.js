@@ -15,6 +15,39 @@ let cameraX = 0;
 let cameraY = 0;
 let cameraZoom = 1;
 
+// Clamp camera so it cannot move far outside the playable world bounds
+function clampCamera() {
+  if (!currentWorld || !gameCanvas) return;
+  const size = currentWorld.size || worldSize;
+  const tileW = gameCanvas.width / size;
+  const tileH = gameCanvas.height / size;
+  const worldW = size * tileW;
+  const worldH = size * tileH;
+  const viewW = gameCanvas.width / cameraZoom;
+  const viewH = gameCanvas.height / cameraZoom;
+
+  let minX, maxX, minY, maxY;
+  if (worldW <= viewW) {
+    minX = maxX = (worldW - viewW) / 2;
+  } else {
+    minX = 0;
+    maxX = worldW - viewW;
+  }
+  if (worldH <= viewH) {
+    minY = maxY = (worldH - viewH) / 2;
+  } else {
+    minY = 0;
+    maxY = worldH - viewH;
+  }
+
+  // small margin (in pixels) so user can pan a bit outside the playable border
+  // Allow a margin equal to a few tiles so the camera can show some ocean around the world
+  const marginTiles = 2; // how many tiles of margin to allow
+  const margin = marginTiles * tileW;
+  cameraX = Math.max(minX - margin, Math.min(maxX + margin, cameraX));
+  cameraY = Math.max(minY - margin, Math.min(maxY + margin, cameraY));
+}
+
 // client-side settings
 const defaultSettings = {
   masterVolume: 1,
@@ -83,6 +116,9 @@ const worldPreviewCanvas = document.getElementById('worldPreviewCanvas');
 const worldPreviewInfo = document.getElementById('worldPreviewInfo');
 const enterWorldBtn = document.getElementById('enterWorldBtn');
 const copyWorldIdBtn = document.getElementById('copyWorldIdBtn');
+const exportWorldBtn = document.getElementById('exportWorldBtn');
+const importWorldBtn = document.getElementById('importWorldBtn');
+const importWorldFile = document.getElementById('importWorldFile');
 let selectedWorldForPreview = null;
 
 const playersListEl = document.getElementById('playersList');
@@ -406,6 +442,28 @@ function previewWorld(worldMeta) {
       }
     };
   }
+  if (exportWorldBtn) {
+    exportWorldBtn.disabled = false;
+    exportWorldBtn.onclick = async () => {
+      if (!selectedWorldForPreview) return;
+      try {
+        const res = await fetch(`/api/worlds/${selectedWorldForPreview.id}/export`);
+        if (!res.ok) throw new Error('Export failed');
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `world-${selectedWorldForPreview.id}.json`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        showNotification('World exported.', 'success');
+      } catch (err) {
+        showNotification('Export failed: ' + (err.message || err), 'error');
+      }
+    };
+  }
   if (enterWorldBtn) {
     enterWorldBtn.disabled = false;
     enterWorldBtn.onclick = () => {
@@ -437,9 +495,48 @@ function renderWorldPreview(preview) {
       ctx.fillRect(x * cell, y * cell, cell, cell);
     }
   }
+  // show metadata if available
+  if (preview.seed !== undefined || preview.climate || preview.creatureCount !== undefined) {
+    const meta = [];
+    if (preview.seed !== undefined) meta.push(`Seed: ${preview.seed}`);
+    if (preview.climate) meta.push(`Climate: ${preview.climate}`);
+    if (preview.islandSize !== undefined) meta.push(`Island: ${preview.islandSize}%`);
+    if (preview.creatureCount !== undefined) meta.push(`Creatures: ${preview.creatureCount}`);
+    if (worldPreviewInfo) worldPreviewInfo.textContent = meta.join(' • ');
+  }
 }
 
 refreshWorldsBtn.onclick = loadWorldsList;
+
+// Import UI wiring
+if (importWorldBtn && importWorldFile) {
+  importWorldBtn.onclick = () => importWorldFile.click();
+  importWorldFile.addEventListener('change', async (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const payload = JSON.parse(text);
+      const res = await fetch('/api/worlds/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showNotification('World imported successfully.', 'success');
+        loadWorldsList();
+      } else {
+        showNotification('Import failed: ' + (data.error || 'unknown'), 'error');
+      }
+    } catch (err) {
+      console.error('Import error', err);
+      showNotification('Failed to import world: ' + (err.message || err), 'error');
+    } finally {
+      importWorldFile.value = '';
+    }
+  });
+}
 
 function joinWorld(worldId, playerName) {
   socket.emit('joinWorld', { worldId, playerName }, (res) => {
@@ -499,12 +596,14 @@ function adjustInitialZoom() {
   const worldCenterY = (size / 2) * (gameCanvas.height / size);
   cameraX = worldCenterX - (gameCanvas.width / (2 * cameraZoom));
   cameraY = worldCenterY - (gameCanvas.height / (2 * cameraZoom));
+  clampCamera();
 }
 
 window.addEventListener('resize', () => {
   if (gameEl && gameEl.classList.contains('visible')) {
     resizeGameCanvas();
     // keep view consistent
+    clampCamera();
     drawWorld();
   }
 });
@@ -765,6 +864,7 @@ resetCameraBtn.onclick = () => {
   cameraX = 0;
   cameraY = 0;
   cameraZoom = 1;
+  clampCamera();
 };
 
 function zoomAt(clientX, clientY, factor) {
@@ -782,6 +882,7 @@ function zoomAt(clientX, clientY, factor) {
   // Adjust camera so the same world point remains under the mouse
   cameraX = worldX - (mouseX / cameraZoom);
   cameraY = worldY - (mouseY / cameraZoom);
+  clampCamera();
 }
 
 // Pause and speed controls
@@ -835,6 +936,7 @@ gameCanvas.addEventListener('mousemove', (e) => {
     cameraY -= dy / cameraZoom;
     lastMouseX = e.clientX;
     lastMouseY = e.clientY;
+    clampCamera();
   }
   
   if (!currentWorld) return;
@@ -876,6 +978,7 @@ gameCanvas.addEventListener('wheel', (e) => {
   // Adjust camera to keep the world coords at mouse position
   cameraX = worldX - (mouseX / cameraZoom);
   cameraY = worldY - (mouseY / cameraZoom);
+  clampCamera();
 });
 
 gameCanvas.addEventListener('click', (e) => {
@@ -986,11 +1089,11 @@ function drawWorld() {
       const isOutOfBounds = x < 0 || y < 0 || x >= size || y >= size;
       
       if (isOutOfBounds) {
-        // Draw ocean for out-of-bounds tiles
+        // Draw ocean for out-of-bounds tiles with slight overlap to prevent gaps
         gameCtx.fillStyle = '#1e3a8a';
-        gameCtx.fillRect(x * tileW, y * tileH, tileW, tileH);
+        gameCtx.fillRect(x * tileW, y * tileH, tileW + 0.5, tileH + 0.5);
       } else {
-        // Draw normal tile
+        // Draw normal tile with slight overlap to prevent sub-pixel gaps
         const tile = tiles[y][x];
         let color = '#000033';
         if (viewMode === 'biome') {
@@ -1005,7 +1108,7 @@ function drawWorld() {
           color = colorFromTemp(tile.temp || tile.tempBase || 0);
         }
         gameCtx.fillStyle = color;
-        gameCtx.fillRect(x * tileW, y * tileH, tileW, tileH);
+        gameCtx.fillRect(x * tileW, y * tileH, tileW + 0.5, tileH + 0.5);
       }
     }
   }
@@ -1045,14 +1148,14 @@ function drawWorld() {
 
   if (settings.showGrid && !settings.reduceEffects) {
     gameCtx.strokeStyle = 'rgba(15,23,42,0.35)';
-    gameCtx.lineWidth = 0.5;
+    gameCtx.lineWidth = 0.5 / cameraZoom; // Adjust for zoom so grid stays thin
     gameCtx.beginPath();
-    for (let x = 0; x <= size; x += 4) {
+    for (let x = 0; x <= size; x += 1) {
       const gx = x * tileW;
       gameCtx.moveTo(gx, 0);
       gameCtx.lineTo(gx, size * tileH);
     }
-    for (let y = 0; y <= size; y += 4) {
+    for (let y = 0; y <= size; y += 1) {
       const gy = y * tileH;
       gameCtx.moveTo(0, gy);
       gameCtx.lineTo(size * tileW, gy);
@@ -1062,7 +1165,7 @@ function drawWorld() {
 
   // Draw world border
   gameCtx.strokeStyle = 'rgba(255, 100, 100, 0.6)';
-  gameCtx.lineWidth = 3;
+  gameCtx.lineWidth = 3 / cameraZoom; // Adjust for zoom
   gameCtx.strokeRect(0, 0, size * tileW, size * tileH);
 
   for (const civ of civilizations) {
