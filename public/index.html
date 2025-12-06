@@ -347,7 +347,7 @@
               <h3>Creature Creator</h3>
             </div>
             <p>Draw with your mouse or upload an image, then record a sound.</p>
-            <canvas id="creatureCanvas" width="128" height="128"></canvas>
+            <canvas id="creatureCanvas" width="256" height="256"></canvas>
             <div class="row gap">
               <button id="clearCreatureCanvasBtn">Clear</button>
               <input type="file" id="creatureImageUpload" accept="image/*">
@@ -380,12 +380,22 @@
               </label>
             </div>
             <button id="createCreatureTypeBtn" class="primary full">Create Species</button>
-            <p class="hint">Select a species below, then click on the world to spawn it.</p>
+            <p class="hint">Creatures will automatically spawn, survive, and reproduce in the world.</p>
           </div>
 
           <div class="panel sidebar-section">
-            <h3>Known Species</h3>
-            <ul id="speciesList"></ul>
+            <h3>Family Tree</h3>
+            <div id="familyTreeContainer" style="max-height: 300px; overflow-y: auto;">
+              <p class="hint" id="familyTreeEmpty">Click on a creature to view its family tree</p>
+              <canvas id="familyTreeCanvas" width="280" height="200" style="display:none; image-rendering: pixelated;"></canvas>
+            </div>
+          </div>
+
+          <div class="panel sidebar-section">
+            <h3>Creature Info</h3>
+            <div id="creatureInfo">
+              <p class="hint">Click on a creature to view its stats</p>
+            </div>
           </div>
 
           <div class="panel sidebar-section">

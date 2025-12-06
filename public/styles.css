@@ -805,8 +805,15 @@ button::after {
 }
 
 button:hover::after {
-  width: 300px;
-  height: 300px;
+  width: 600px;
+  height: 600px;
+}
+
+@media (max-width: 640px) {
+  button:hover::after {
+    width: 300px;
+    height: 300px;
+  }
 }
 
 button.primary {
@@ -1467,6 +1474,16 @@ label span {
   border: 2px solid rgba(59, 130, 246, 0.4);
   cursor: crosshair;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+  width: 256px;
+  height: 256px;
+  max-width: 100%;
+  display: block;
+  margin: 0 auto;
+}
+
+/* When an image is uploaded, show it as the preview (hide patterned bg) */
+#creatureCanvas.has-image {
+  background: transparent !important;
 }
 
 .row {
@@ -1497,6 +1514,29 @@ label span {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px 12px;
   margin-top: 8px;
+}
+
+/* Align label text and control horizontally in the creator form */
+.form-grid label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+.form-grid label span {
+  width: 72px;
+  flex-shrink: 0;
+  color: var(--text-main);
+  font-weight: 600;
+}
+.form-grid input[type="number"], .form-grid input[type="text"], .form-grid input, .form-grid select {
+  flex: 1 1 auto;
+  margin-top: 0;
+}
+
+/* Space the create species button from the form */
+#createCreatureTypeBtn {
+  margin-top: 12px;
 }
 
 .button-row {

@@ -209,6 +209,56 @@ function createNewWorld(name, options = {}) {
   const climate = options.climate || 'temperate';
   
   const tiles = generateWorld(seed, size, islandSize, climate);
+  
+  // Create initial creature type
+  const initialTypeId = uuidv4();
+  const initialType = {
+    id: initialTypeId,
+    name: 'Primordial',
+    diet: 'herbivore',
+    size: 1,
+    speed: 1,
+    generation: 0,
+    parentTypeId: null,
+    evoScore: 0,
+    imageDataUrl: null,
+    soundDataUrl: null
+  };
+  
+  // Find a good spawn location (grass or forest)
+  let spawnX = size / 2;
+  let spawnY = size / 2;
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const tile = tiles[y][x];
+      if (tile.biome === 'grass' || tile.biome === 'forest') {
+        spawnX = x + 0.5;
+        spawnY = y + 0.5;
+        break;
+      }
+    }
+    if (spawnX !== size / 2) break;
+  }
+  
+  // Spawn initial creature
+  const initialCreature = {
+    id: uuidv4(),
+    typeId: initialTypeId,
+    x: spawnX,
+    y: spawnY,
+    vx: 0,
+    vy: 0,
+    targetX: null,
+    targetY: null,
+    hunger: 0.3,
+    age: 0,
+    health: 100,
+    generation: 0,
+    parentId: null,
+    parent2Id: null,
+    ownerSocketId: null
+  };
+  
   const world = {
     id,
     name,
@@ -217,8 +267,8 @@ function createNewWorld(name, options = {}) {
     islandSize,
     climate,
     tiles,
-    creatureTypes: {},
-    creatures: [],
+    creatureTypes: { [initialTypeId]: initialType },
+    creatures: [initialCreature],
     players: {},
     civilizations: [],
     time: 0,
@@ -731,6 +781,10 @@ function simulateWorld(world, dt) {
   for (let c of creatures) {
     c.age += dt;
     c.hunger += 0.005 * dt;
+    
+    // Initialize velocity if not present
+    if (c.vx === undefined) c.vx = 0;
+    if (c.vy === undefined) c.vy = 0;
 
     const type = types[c.typeId];
     if (!type) continue;
@@ -739,14 +793,15 @@ function simulateWorld(world, dt) {
     const ty = Math.max(0, Math.min(size - 1, Math.floor(c.y)));
     const tile = tiles[ty][tx];
 
-    // Improved AI: seek food sources
-    let targetX = null;
-    let targetY = null;
+    // AI: Seek food when hungry, or seek mates
+    let targetX = c.targetX;
+    let targetY = c.targetY;
+    let seeking = null;
     
-    if (type.diet === 'plant' && c.hunger > 0.3) {
-      // Look for nearby food
+    // Seek food if hungry
+    if (c.hunger > 0.4) {
       let bestFood = 0;
-      const searchRadius = 5;
+      const searchRadius = 8;
       
       for (let dy = -searchRadius; dy <= searchRadius; dy++) {
         for (let dx = -searchRadius; dx <= searchRadius; dx++) {
@@ -754,49 +809,98 @@ function simulateWorld(world, dt) {
           const checkY = Math.max(0, Math.min(size - 1, ty + dy));
           const checkTile = tiles[checkY][checkX];
           
-          if (checkTile.food > bestFood) {
+          if (checkTile.food > bestFood && checkTile.food > 2) {
             bestFood = checkTile.food;
             targetX = checkX + 0.5;
             targetY = checkY + 0.5;
+            seeking = 'food';
           }
         }
       }
     }
+    
+    // Seek mates if well-fed
+    if (!seeking && c.hunger < 0.5 && c.age > 30 && c.age < 400) {
+      let closestMate = null;
+      let closestDist = 10;
+      
+      for (const other of creatures) {
+        if (other.id === c.id) continue;
+        if (other.age < 30 || other.age > 400) continue;
+        if (other.hunger > 0.6) continue;
+        
+        const dx = other.x - c.x;
+        const dy = other.y - c.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        if (dist < closestDist) {
+          closestDist = dist;
+          closestMate = other;
+        }
+      }
+      
+      if (closestMate) {
+        targetX = closestMate.x;
+        targetY = closestMate.y;
+        seeking = 'mate';
+      }
+    }
 
-    // Move towards target or wander
-    const moveSpeed = (type.speed || 1) * 0.02 * dt;
-    let dx, dy;
+    // Smooth velocity-based movement
+    const moveSpeed = (type.speed || 1) * 0.015;
+    const friction = 0.85; // Smooth deceleration
     
     if (targetX !== null && targetY !== null) {
-      // Move towards food
+      // Move towards target
       const dirX = targetX - c.x;
       const dirY = targetY - c.y;
       const dist = Math.sqrt(dirX * dirX + dirY * dirY);
-      if (dist > 0) {
-        dx = (dirX / dist) * moveSpeed * 2; // Move faster towards food
-        dy = (dirY / dist) * moveSpeed * 2;
+      
+      if (dist > 0.1) {
+        const accelX = (dirX / dist) * moveSpeed * dt;
+        const accelY = (dirY / dist) * moveSpeed * dt;
+        c.vx += accelX;
+        c.vy += accelY;
+        c.targetX = targetX;
+        c.targetY = targetY;
       } else {
-        dx = 0;
-        dy = 0;
+        // Reached target
+        c.targetX = null;
+        c.targetY = null;
       }
     } else {
       // Random wandering
-      dx = (Math.random() - 0.5) * moveSpeed;
-      dy = (Math.random() - 0.5) * moveSpeed;
+      if (Math.random() < 0.01 * dt) {
+        c.vx += (Math.random() - 0.5) * moveSpeed * dt;
+        c.vy += (Math.random() - 0.5) * moveSpeed * dt;
+      }
     }
     
-    c.x = Math.max(0, Math.min(size - 0.001, c.x + dx));
-    c.y = Math.max(0, Math.min(size - 0.001, c.y + dy));
+    // Apply friction
+    c.vx *= Math.pow(friction, dt);
+    c.vy *= Math.pow(friction, dt);
+    
+    // Limit speed
+    const maxSpeed = moveSpeed * 2;
+    const speed = Math.sqrt(c.vx * c.vx + c.vy * c.vy);
+    if (speed > maxSpeed) {
+      c.vx = (c.vx / speed) * maxSpeed;
+      c.vy = (c.vy / speed) * maxSpeed;
+    }
+    
+    // Update position
+    c.x = Math.max(0, Math.min(size - 0.001, c.x + c.vx * dt));
+    c.y = Math.max(0, Math.min(size - 0.001, c.y + c.vy * dt));
 
     // Update tile position after movement
     const newTx = Math.max(0, Math.min(size - 1, Math.floor(c.x)));
     const newTy = Math.max(0, Math.min(size - 1, Math.floor(c.y)));
     const newTile = tiles[newTy][newTx];
 
-    // Eating behavior - interact with vegetation
-    if (type.diet === 'plant') {
+    // Eating behavior
+    if (type.diet === 'herbivore' || type.diet === 'plant' || !type.diet) {
       if (newTile.food > 0 && c.hunger > 0.2) {
-        const eatAmount = Math.min(newTile.food, 0.08 * dt);
+        const eatAmount = Math.min(newTile.food, 0.1 * dt);
         newTile.food -= eatAmount;
         c.hunger = Math.max(0, c.hunger - eatAmount * 2);
         
@@ -810,22 +914,80 @@ function simulateWorld(world, dt) {
       }
     }
 
-    // Reproduction
-    if (c.hunger < 0.5 && c.age > 20 && c.age < 300) {
-      if (Math.random() < 0.0005 * dt) {
-        const baby = {
-          id: uuidv4(),
-          typeId: c.typeId,
-          x: Math.max(0, Math.min(size - 0.001, c.x + (Math.random() - 0.5))),
-          y: Math.max(0, Math.min(size - 0.001, c.y + (Math.random() - 0.5))),
-          hunger: 0.2,
-          age: 0,
-          generation: (c.generation || 0) + 1,
-          ownerSocketId: c.ownerSocketId
-        };
-        creatures.push(baby);
-        if (!typeStats[c.typeId]) typeStats[c.typeId] = { count: 0, births: 0 };
-        typeStats[c.typeId].births += 1;
+    // Reproduction - check for nearby mates
+    if (c.hunger < 0.5 && c.age > 30 && c.age < 400) {
+      // Find nearby potential mates
+      for (const mate of creatures) {
+        if (mate.id === c.id) continue;
+        if (mate.age < 30 || mate.age > 400) continue;
+        if (mate.hunger > 0.6) continue;
+        
+        const dx = mate.x - c.x;
+        const dy = mate.y - c.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        // If close enough, reproduce
+        if (dist < 0.5 && Math.random() < 0.001 * dt) {
+          const parent1Type = types[c.typeId];
+          const parent2Type = types[mate.typeId];
+          
+          let babyTypeId = c.typeId;
+          let isHybrid = false;
+          
+          // Check if parents are different species
+          if (c.typeId !== mate.typeId && parent1Type && parent2Type) {
+            // Create hybrid type
+            isHybrid = true;
+            const hybridId = uuidv4();
+            const hybridType = {
+              id: hybridId,
+              name: `${parent1Type.name}-${parent2Type.name} Hybrid`,
+              diet: parent1Type.diet, // Inherit from first parent
+              size: (parent1Type.size + parent2Type.size) / 2,
+              speed: (parent1Type.speed + parent2Type.speed) / 2,
+              generation: Math.max(parent1Type.generation, parent2Type.generation) + 1,
+              parentTypeId: parent1Type.id,
+              parent2TypeId: parent2Type.id,
+              evoScore: 0,
+              imageDataUrl: null, // Will be generated on client
+              soundDataUrl: null,
+              isHybrid: true
+            };
+            types[hybridId] = hybridType;
+            babyTypeId = hybridId;
+            
+            // Emit new type to all clients
+            io.to(world.id).emit('creatureTypeCreated', { type: hybridType, needsHybridImage: true, parent1: parent1Type, parent2: parent2Type });
+          }
+          
+          const baby = {
+            id: uuidv4(),
+            typeId: babyTypeId,
+            x: Math.max(0, Math.min(size - 0.001, c.x + (Math.random() - 0.5) * 0.5)),
+            y: Math.max(0, Math.min(size - 0.001, c.y + (Math.random() - 0.5) * 0.5)),
+            vx: 0,
+            vy: 0,
+            targetX: null,
+            targetY: null,
+            hunger: 0.2,
+            age: 0,
+            health: 100,
+            generation: Math.max(c.generation || 0, mate.generation || 0) + 1,
+            parentId: c.id,
+            parent2Id: mate.id,
+            ownerSocketId: c.ownerSocketId
+          };
+          creatures.push(baby);
+          
+          if (!typeStats[babyTypeId]) typeStats[babyTypeId] = { count: 0, births: 0 };
+          typeStats[babyTypeId].births += 1;
+          
+          // Increase hunger after reproduction
+          c.hunger += 0.2;
+          mate.hunger += 0.2;
+          
+          break; // Only one baby per cycle
+        }
       }
     }
 

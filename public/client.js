@@ -6,6 +6,7 @@ let creatureTypes = {};
 let creatures = [];
 let civilizations = [];
 let selectedSpeciesId = null;
+let selectedCreature = null;
 let currentPower = null;
 let worldSize = 64;
 let viewMode = 'biome';
@@ -14,6 +15,8 @@ let viewMode = 'biome';
 let cameraX = 0;
 let cameraY = 0;
 let cameraZoom = 1;
+// Whether an uploaded creature image is present (disables freehand drawing)
+let creatureImageLoaded = false;
 
 // Clamp camera so it cannot move far outside the playable world bounds
 function clampCamera() {
@@ -508,15 +511,32 @@ function previewWorld(worldMeta) {
 
 function renderWorldPreview(preview) {
   if (!worldPreviewCanvas) return;
-  const ctx = worldPreviewCanvas.getContext('2d');
+  // Make the canvas pixel-perfect for the preview and ensure full coverage
   const size = preview.size || 64;
-  const cell = Math.floor(worldPreviewCanvas.width / size);
+  const displayCss = Math.max(64, Math.floor(worldPreviewCanvas.clientWidth || 360));
+  const dpr = window.devicePixelRatio || 1;
+  const pixelSize = Math.max(1, Math.floor(displayCss * dpr));
+  // Set canvas internal pixel size to avoid scaling artifacts and ensure we draw every cell
+  worldPreviewCanvas.width = pixelSize;
+  worldPreviewCanvas.height = pixelSize;
+  // Keep the displayed CSS size the same
+  worldPreviewCanvas.style.width = displayCss + 'px';
+  worldPreviewCanvas.style.height = displayCss + 'px';
+  const ctx = worldPreviewCanvas.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
   ctx.clearRect(0, 0, worldPreviewCanvas.width, worldPreviewCanvas.height);
+
+  // Compute cell size in device pixels (may be fractional) and draw using integer rounding
+  const cell = worldPreviewCanvas.width / size;
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const c = preview.colors[y * size + x] || '#000';
       ctx.fillStyle = c;
-      ctx.fillRect(x * cell, y * cell, cell, cell);
+      const x0 = Math.round(x * cell);
+      const y0 = Math.round(y * cell);
+      const x1 = Math.round((x + 1) * cell);
+      const y1 = Math.round((y + 1) * cell);
+      ctx.fillRect(x0, y0, Math.max(1, x1 - x0), Math.max(1, y1 - y0));
     }
   }
   // show metadata if available
@@ -578,7 +598,6 @@ function joinWorld(worldId, playerName) {
 
     showScreen(gameEl);
     updateTopBar();
-    rebuildSpeciesList();
     initCreatureCanvas();
     // Ensure canvas matches container size and adjust zoom for visibility
     resizeGameCanvas();
@@ -670,15 +689,24 @@ settingReduceEffects.onchange = () => {
 // --- creature drawing ---
 
 function initCreatureCanvas() {
+  if (!creatureCanvas || !creatureCtx) {
+    console.error('Creature canvas not available');
+    return;
+  }
   // Clear with transparent background
   creatureCtx.clearRect(0, 0, creatureCanvas.width, creatureCanvas.height);
   creatureCtx.strokeStyle = '#ffffff';
   creatureCtx.lineWidth = 4;
   creatureCtx.lineCap = 'round';
+  // Ensure drawing mode is enabled after init
+  creatureImageLoaded = false;
+  creatureCanvas.style.cursor = 'crosshair';
+  if (creatureCanvas.classList) creatureCanvas.classList.remove('has-image');
 }
 
 let drawing = false;
 creatureCanvas.addEventListener('mousedown', (e) => {
+  if (creatureImageLoaded) return; // prevent drawing when an image is loaded
   drawing = true;
   creatureCtx.beginPath();
   const rect = creatureCanvas.getBoundingClientRect();
@@ -687,6 +715,7 @@ creatureCanvas.addEventListener('mousedown', (e) => {
   creatureCtx.moveTo(x, y);
 });
 creatureCanvas.addEventListener('mousemove', (e) => {
+  if (creatureImageLoaded) return;
   if (!drawing) return;
   const rect = creatureCanvas.getBoundingClientRect();
   const x = e.clientX - rect.left;
@@ -698,10 +727,14 @@ creatureCanvas.addEventListener('mouseup', () => {
   drawing = false;
 });
 creatureCanvas.addEventListener('mouseleave', () => {
+  if (creatureImageLoaded) return;
   drawing = false;
 });
 
 clearCreatureCanvasBtn.onclick = () => initCreatureCanvas();
+
+// Initialize canvas on page load
+initCreatureCanvas();
 
 creatureImageUpload.addEventListener('change', (e) => {
   const file = e.target.files[0];
@@ -716,7 +749,13 @@ creatureImageUpload.addEventListener('change', (e) => {
       const h = img.height * scale;
       const x = (creatureCanvas.width - w) / 2;
       const y = (creatureCanvas.height - h) / 2;
+      // Draw the uploaded image as a preview (disable smoothing for pixel art clarity)
+      try { creatureCtx.imageSmoothingEnabled = false; } catch (e) {}
       creatureCtx.drawImage(img, x, y, w, h);
+      // When an image is uploaded, disable the freehand drawing option and mark preview state
+      creatureImageLoaded = true;
+      creatureCanvas.style.cursor = 'default';
+      if (creatureCanvas.classList) creatureCanvas.classList.add('has-image');
     };
     img.src = ev.target.result;
   };
@@ -800,25 +839,56 @@ createCreatureTypeBtn.onclick = () => {
     }
     const type = res.type;
     creatureTypes[type.id] = type;
-    rebuildSpeciesList();
     creatureSoundDataUrl = null;
     recordingStatus.textContent = 'No sound recorded';
     showNotification(`Species "${name}" created!`, 'success');
   });
 };
 
-function rebuildSpeciesList() {
-  speciesListEl.innerHTML = '';
-  Object.values(creatureTypes).forEach(type => {
-    const li = document.createElement('li');
-    li.textContent = type.name + ' [' + (type.diet || '?') + ']';
-    li.onclick = () => {
-      selectedSpeciesId = type.id;
-      Array.from(speciesListEl.children).forEach(c => c.classList.remove('selected'));
-      li.classList.add('selected');
-    };
-    speciesListEl.appendChild(li);
-  });
+// Hybrid image generation - blend two parent images
+function generateHybridImage(parent1Type, parent2Type, hybridType) {
+  if (!parent1Type.imageDataUrl && !parent2Type.imageDataUrl) return null;
+  
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+  
+  // Load both parent images
+  const img1 = new Image();
+  const img2 = new Image();
+  
+  let loaded = 0;
+  const onLoad = () => {
+    loaded++;
+    if (loaded === 2) {
+      // Draw both images with alpha blending
+      ctx.globalAlpha = 0.5;
+      if (parent1Type.imageDataUrl) {
+        ctx.drawImage(img1, 0, 0, 256, 256);
+      }
+      if (parent2Type.imageDataUrl) {
+        ctx.drawImage(img2, 0, 0, 256, 256);
+      }
+      
+      // Convert to data URL
+      hybridType.imageDataUrl = canvas.toDataURL('image/png');
+    }
+  };
+  
+  if (parent1Type.imageDataUrl) {
+    img1.onload = onLoad;
+    img1.src = parent1Type.imageDataUrl;
+  } else {
+    loaded++;
+  }
+  
+  if (parent2Type.imageDataUrl) {
+    img2.onload = onLoad;
+    img2.src = parent2Type.imageDataUrl;
+  } else {
+    loaded++;
+  }
 }
 
 // --- powers ---
@@ -864,6 +934,198 @@ function openCreatorModal() {
     document.getElementById('creatorCloseBtn').onclick = closeCreatorModal;
   }
   creatorOverlayEl.style.display = 'flex';
+  
+  // Re-attach all event listeners to the cloned elements in the modal
+  setTimeout(() => {
+    const modalCreatureCanvas = document.querySelector('.creator-modal #creatureCanvas');
+    const modalCreatureCtx = modalCreatureCanvas ? modalCreatureCanvas.getContext('2d') : null;
+    const modalClearBtn = document.querySelector('.creator-modal #clearCreatureCanvasBtn');
+    const modalImageUpload = document.querySelector('.creator-modal #creatureImageUpload');
+    const modalStartRecording = document.querySelector('.creator-modal #startRecordingBtn');
+    const modalStopRecording = document.querySelector('.creator-modal #stopRecordingBtn');
+    const modalRecordingStatus = document.querySelector('.creator-modal #recordingStatus');
+    const modalCreateBtn = document.querySelector('.creator-modal #createCreatureTypeBtn');
+    const modalNameInput = document.querySelector('.creator-modal #creatureNameInput');
+    const modalDietSelect = document.querySelector('.creator-modal #creatureDietSelect');
+    const modalSizeInput = document.querySelector('.creator-modal #creatureSizeInput');
+    const modalSpeedInput = document.querySelector('.creator-modal #creatureSpeedInput');
+    
+    if (!modalCreatureCanvas || !modalCreatureCtx) {
+      console.error('Modal canvas not found');
+      return;
+    }
+    
+    // Initialize canvas
+    modalCreatureCtx.clearRect(0, 0, modalCreatureCanvas.width, modalCreatureCanvas.height);
+    modalCreatureCtx.strokeStyle = '#ffffff';
+    modalCreatureCtx.lineWidth = 4;
+    modalCreatureCtx.lineCap = 'round';
+    modalCreatureCanvas.style.cursor = 'crosshair';
+    modalCreatureCanvas.classList.remove('has-image');
+    
+    let modalDrawing = false;
+    let modalImageLoaded = false;
+    let modalSoundDataUrl = null;
+    let modalMediaRecorder = null;
+    let modalRecordedChunks = [];
+    
+    // Mouse events for drawing
+    modalCreatureCanvas.addEventListener('mousedown', (e) => {
+      if (modalImageLoaded) return;
+      modalDrawing = true;
+      modalCreatureCtx.beginPath();
+      const rect = modalCreatureCanvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      modalCreatureCtx.moveTo(x, y);
+    });
+    
+    modalCreatureCanvas.addEventListener('mousemove', (e) => {
+      if (modalImageLoaded || !modalDrawing) return;
+      const rect = modalCreatureCanvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      modalCreatureCtx.lineTo(x, y);
+      modalCreatureCtx.stroke();
+    });
+    
+    modalCreatureCanvas.addEventListener('mouseup', () => {
+      modalDrawing = false;
+    });
+    
+    modalCreatureCanvas.addEventListener('mouseleave', () => {
+      if (modalImageLoaded) return;
+      modalDrawing = false;
+    });
+    
+    // Clear button
+    if (modalClearBtn) {
+      modalClearBtn.onclick = () => {
+        modalCreatureCtx.clearRect(0, 0, modalCreatureCanvas.width, modalCreatureCanvas.height);
+        modalCreatureCtx.strokeStyle = '#ffffff';
+        modalCreatureCtx.lineWidth = 4;
+        modalCreatureCtx.lineCap = 'round';
+        modalImageLoaded = false;
+        modalCreatureCanvas.style.cursor = 'crosshair';
+        modalCreatureCanvas.classList.remove('has-image');
+      };
+    }
+    
+    // Image upload
+    if (modalImageUpload) {
+      modalImageUpload.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const img = new Image();
+          img.onload = () => {
+            // Clear and prepare canvas
+            modalCreatureCtx.clearRect(0, 0, modalCreatureCanvas.width, modalCreatureCanvas.height);
+            modalCreatureCtx.strokeStyle = '#ffffff';
+            modalCreatureCtx.lineWidth = 4;
+            modalCreatureCtx.lineCap = 'round';
+            
+            // Draw image scaled to fit
+            const scale = Math.min(
+              modalCreatureCanvas.width / img.width,
+              modalCreatureCanvas.height / img.height
+            );
+            const w = img.width * scale;
+            const h = img.height * scale;
+            const x = (modalCreatureCanvas.width - w) / 2;
+            const y = (modalCreatureCanvas.height - h) / 2;
+            modalCreatureCtx.drawImage(img, x, y, w, h);
+            
+            modalImageLoaded = true;
+            modalCreatureCanvas.style.cursor = 'default';
+            modalCreatureCanvas.classList.add('has-image');
+          };
+          img.src = ev.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+    
+    // Recording
+    if (modalStartRecording) {
+      modalStartRecording.onclick = async () => {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          modalMediaRecorder = new MediaRecorder(stream);
+          modalRecordedChunks = [];
+          
+          modalMediaRecorder.ondataavailable = (e) => {
+            if (e.data.size > 0) modalRecordedChunks.push(e.data);
+          };
+          
+          modalMediaRecorder.onstop = () => {
+            const blob = new Blob(modalRecordedChunks, { type: 'audio/webm' });
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              modalSoundDataUrl = reader.result;
+              if (modalRecordingStatus) modalRecordingStatus.textContent = 'Sound recorded';
+            };
+            reader.readAsDataURL(blob);
+          };
+          
+          modalMediaRecorder.start();
+          const MAX_MS = 5000;
+          setTimeout(() => {
+            if (modalMediaRecorder && modalMediaRecorder.state === 'recording') {
+              modalMediaRecorder.stop();
+            }
+          }, MAX_MS);
+          
+          modalStartRecording.disabled = true;
+          if (modalStopRecording) modalStopRecording.disabled = false;
+          if (modalRecordingStatus) modalRecordingStatus.textContent = 'Recording...';
+        } catch (err) {
+          console.error(err);
+          showNotification('Could not start recording. Check microphone permissions.', 'error');
+        }
+      };
+    }
+    
+    if (modalStopRecording) {
+      modalStopRecording.onclick = () => {
+        if (modalMediaRecorder && modalMediaRecorder.state === 'recording') {
+          modalMediaRecorder.stop();
+        }
+        if (modalStartRecording) modalStartRecording.disabled = false;
+        modalStopRecording.disabled = true;
+      };
+    }
+    
+    // Create species button
+    if (modalCreateBtn) {
+      modalCreateBtn.onclick = () => {
+        if (!currentWorld) {
+          showNotification('Join a world first.', 'error');
+          return;
+        }
+        const name = modalNameInput ? modalNameInput.value.trim() || 'Unnamed Species' : 'Unnamed Species';
+        const diet = modalDietSelect ? modalDietSelect.value : 'omnivore';
+        const size = modalSizeInput ? parseFloat(modalSizeInput.value) || 1 : 1;
+        const speed = modalSpeedInput ? parseFloat(modalSpeedInput.value) || 1 : 1;
+        
+        const imageDataUrl = modalCreatureCanvas.toDataURL('image/png');
+        socket.emit('createCreatureType', {
+          worldId: currentWorld.id,
+          creatureType: {
+            name,
+            diet,
+            size,
+            speed,
+            imageDataUrl,
+            soundDataUrl: modalSoundDataUrl
+          }
+        });
+        showNotification('Species "' + name + '" created!', 'success');
+        closeCreatorModal();
+      };
+    }
+  }, 50);
 }
 
 function closeCreatorModal() {
@@ -1038,8 +1300,37 @@ gameCanvas.addEventListener('click', (e) => {
   const rect = gameCanvas.getBoundingClientRect();
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
-  const tileX = Math.floor((x / cameraZoom + cameraX) / (gameCanvas.width / worldSize));
-  const tileY = Math.floor((y / cameraZoom + cameraY) / (gameCanvas.height / worldSize));
+  
+  // Convert screen coordinates to world coordinates
+  const worldX = (x / cameraZoom + cameraX) / (gameCanvas.width / worldSize);
+  const worldY = (y / cameraZoom + cameraY) / (gameCanvas.height / worldSize);
+  
+  const tileX = Math.floor(worldX);
+  const tileY = Math.floor(worldY);
+
+  // Check if clicking on a creature first
+  let clickedCreature = null;
+  for (const c of creatures) {
+    const type = creatureTypes[c.typeId];
+    if (!type) continue;
+    const dx = worldX - c.x;
+    const dy = worldY - c.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const clickRadius = (type.size || 1) * 0.15; // Adjust click hitbox
+    
+    if (dist < clickRadius) {
+      clickedCreature = c;
+      break;
+    }
+  }
+  
+  if (clickedCreature) {
+    selectedCreature = clickedCreature;
+    updateCreatureInfo(clickedCreature);
+    drawFamilyTree(clickedCreature);
+    drawWorld(); // Redraw to show selection highlight
+    return;
+  }
 
   // Enforce world border - don't allow interactions outside world bounds
   if (tileX < 0 || tileY < 0 || tileX >= worldSize || tileY >= worldSize) {
@@ -1058,17 +1349,7 @@ gameCanvas.addEventListener('click', (e) => {
     return;
   }
 
-  if (selectedSpeciesId) {
-    socket.emit('spawnCreature', {
-      worldId: currentWorld.id,
-      typeId: selectedSpeciesId,
-      x: tileX,
-      y: tileY
-    }, (res) => {
-      if (!res.ok) showNotification(res.error, 'error');
-    });
-  }
-
+  // Removed spawn creature functionality
   updateTileInfo(tileX, tileY);
 });
 
@@ -1087,6 +1368,134 @@ function updateTileInfo(tx, ty, hoverOnly) {
     Temp: ${tile.temp !== undefined ? tile.temp.toFixed(1) : 'n/a'}°C<br>
     Moisture: ${tile.moist !== undefined ? tile.moist.toFixed(2) : 'n/a'}`;
   tileInfoEl.innerHTML = text;
+}
+
+function updateCreatureInfo(creature) {
+  const creatureInfoEl = document.getElementById('creatureInfo');
+  if (!creatureInfoEl || !creature) {
+    if (creatureInfoEl) creatureInfoEl.innerHTML = '<p class="hint">Click on a creature to view its stats</p>';
+    return;
+  }
+  
+  const type = creatureTypes[creature.typeId];
+  if (!type) return;
+  
+  const parent1 = creatures.find(c => c.id === creature.parentId);
+  const parent2 = creatures.find(c => c.id === creature.parent2Id);
+  const parent1Type = parent1 ? creatureTypes[parent1.typeId] : null;
+  const parent2Type = parent2 ? creatureTypes[parent2.typeId] : null;
+  
+  const parentText = parent1Type && parent2Type 
+    ? `<br><strong>Parents:</strong> ${parent1Type.name} × ${parent2Type.name}`
+    : parent1Type 
+    ? `<br><strong>Parent:</strong> ${parent1Type.name}`
+    : '';
+  
+  const healthPercent = ((creature.health || 100) / 100 * 100).toFixed(0);
+  const hungerPercent = (Math.max(0, Math.min(1, creature.hunger)) * 100).toFixed(0);
+  
+  creatureInfoEl.innerHTML = `
+    <strong>${type.name}</strong> ${type.isHybrid ? '(Hybrid)' : ''}<br>
+    <strong>Age:</strong> ${Math.floor(creature.age || 0)}<br>
+    <strong>Generation:</strong> ${creature.generation || 0}<br>
+    <strong>Health:</strong> ${healthPercent}%<br>
+    <strong>Hunger:</strong> ${hungerPercent}%<br>
+    <strong>Size:</strong> ${(type.size || 1).toFixed(1)}<br>
+    <strong>Speed:</strong> ${(type.speed || 1).toFixed(1)}<br>
+    <strong>Diet:</strong> ${type.diet || 'herbivore'}${parentText}
+  `;
+}
+
+function drawFamilyTree(creature) {
+  const canvas = document.getElementById('familyTreeCanvas');
+  const emptyMsg = document.getElementById('familyTreeEmpty');
+  if (!canvas || !creature) {
+    if (canvas) canvas.style.display = 'none';
+    if (emptyMsg) emptyMsg.style.display = 'block';
+    return;
+  }
+  
+  canvas.style.display = 'block';
+  if (emptyMsg) emptyMsg.style.display = 'none';
+  
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+  // Build family tree structure
+  const tree = buildFamilyTree(creature, 3); // 3 generations
+  
+  // Draw tree
+  ctx.fillStyle = '#f9fafb';
+  ctx.font = '10px Inter, sans-serif';
+  ctx.textAlign = 'center';
+  
+  drawTreeNode(ctx, tree, canvas.width / 2, 20, 0, creature.id);
+}
+
+function buildFamilyTree(creature, depth) {
+  if (!creature || depth <= 0) return null;
+  
+  const type = creatureTypes[creature.typeId];
+  const parent1 = creatures.find(c => c.id === creature.parentId);
+  const parent2 = creatures.find(c => c.id === creature.parent2Id);
+  
+  return {
+    creature,
+    type,
+    left: parent1 ? buildFamilyTree(parent1, depth - 1) : null,
+    right: parent2 ? buildFamilyTree(parent2, depth - 1) : null
+  };
+}
+
+function drawTreeNode(ctx, node, x, y, level, selectedId) {
+  if (!node) return;
+  
+  const nodeSize = 16;
+  const vertSpacing = 50;
+  const horzSpacing = Math.max(30, 80 - level * 15);
+  
+  // Draw lines to parents
+  if (node.left) {
+    const leftX = x - horzSpacing;
+    const leftY = y + vertSpacing;
+    ctx.strokeStyle = '#4b5563';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x, y + nodeSize/2);
+    ctx.lineTo(leftX, leftY - nodeSize/2);
+    ctx.stroke();
+    drawTreeNode(ctx, node.left, leftX, leftY, level + 1, selectedId);
+  }
+  
+  if (node.right) {
+    const rightX = x + horzSpacing;
+    const rightY = y + vertSpacing;
+    ctx.strokeStyle = '#4b5563';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x, y + nodeSize/2);
+    ctx.lineTo(rightX, rightY - nodeSize/2);
+    ctx.stroke();
+    drawTreeNode(ctx, node.right, rightX, rightY, level + 1, selectedId);
+  }
+  
+  // Draw node
+  const isSelected = node.creature.id === selectedId;
+  ctx.fillStyle = isSelected ? '#fbbf24' : (node.type && node.type.isHybrid ? '#a855f7' : '#6366f1');
+  ctx.beginPath();
+  ctx.arc(x, y, nodeSize/2, 0, Math.PI * 2);
+  ctx.fill();
+  
+  if (isSelected) {
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+  
+  // Draw label
+  const label = node.type ? node.type.name.substring(0, 10) : '?';
+  ctx.fillStyle = '#f9fafb';
+  ctx.fillText(label, x, y + nodeSize/2 + 12);
 }
 
 // --- rendering ---
@@ -1240,20 +1649,52 @@ function drawWorld() {
     const baseSize = (type.size || 1) * 8;
     const drawSize = settings.reduceEffects ? baseSize : baseSize + Math.sin(performance.now() / 300 + (c.id && c.id.toString().length)) * 0.5;
 
+    // Calculate rotation based on velocity
+    const vx = c.vx || 0;
+    const vy = c.vy || 0;
+    const rotation = Math.atan2(vy, vx);
+    const hasVelocity = Math.abs(vx) > 0.001 || Math.abs(vy) > 0.001;
+
+    gameCtx.save();
+    gameCtx.translate(cx, cy);
+    if (hasVelocity) {
+      gameCtx.rotate(rotation);
+    }
+
     if (!type._imageObj) {
       const img = new Image();
       img.src = type.imageDataUrl;
       type._imageObj = img;
     }
     const img = type._imageObj;
-    if (img.complete) {
-      gameCtx.drawImage(img, cx - drawSize/2, cy - drawSize/2, drawSize, drawSize);
+    if (img.complete && type.imageDataUrl) {
+      gameCtx.drawImage(img, -drawSize/2, -drawSize/2, drawSize, drawSize);
     } else {
-      gameCtx.fillStyle = '#f97316';
+      // Default circle if no image
+      gameCtx.fillStyle = type.isHybrid ? '#a855f7' : '#f97316';
       gameCtx.beginPath();
-      gameCtx.arc(cx, cy, drawSize/2, 0, Math.PI * 2);
+      gameCtx.arc(0, 0, drawSize/2, 0, Math.PI * 2);
       gameCtx.fill();
+      
+      // Direction indicator
+      if (hasVelocity) {
+        gameCtx.fillStyle = '#fff';
+        gameCtx.beginPath();
+        gameCtx.arc(drawSize/3, 0, drawSize/6, 0, Math.PI * 2);
+        gameCtx.fill();
+      }
     }
+    
+    // Draw selection highlight if selected
+    if (selectedCreature && selectedCreature.id === c.id) {
+      gameCtx.strokeStyle = '#fbbf24';
+      gameCtx.lineWidth = 2 / cameraZoom;
+      gameCtx.beginPath();
+      gameCtx.arc(0, 0, drawSize/2 + 3, 0, Math.PI * 2);
+      gameCtx.stroke();
+    }
+
+    gameCtx.restore();
   }
 
   gameCtx.restore();
@@ -1300,7 +1741,11 @@ function updateCreatureCount() {
 socket.on('creatureTypeCreated', (data) => {
   const type = data.type;
   creatureTypes[type.id] = type;
-  rebuildSpeciesList();
+  
+  // Generate hybrid image if needed
+  if (data.needsHybridImage && data.parent1 && data.parent2) {
+    generateHybridImage(data.parent1, data.parent2, data.type);
+  }
 });
 
 socket.on('creatureSpawned', (data) => {
@@ -1312,6 +1757,22 @@ socket.on('worldUpdate', (data) => {
   creatures = data.creatures || creatures;
   civilizations = data.civilizations || civilizations;
   updateCreatureCount();
+  
+  // Update selected creature if it still exists
+  if (selectedCreature) {
+    const stillExists = creatures.find(c => c.id === selectedCreature.id);
+    if (stillExists) {
+      selectedCreature = stillExists;
+      updateCreatureInfo(stillExists);
+    } else {
+      selectedCreature = null;
+      updateCreatureInfo(null);
+      const canvas = document.getElementById('familyTreeCanvas');
+      const emptyMsg = document.getElementById('familyTreeEmpty');
+      if (canvas) canvas.style.display = 'none';
+      if (emptyMsg) emptyMsg.style.display = 'block';
+    }
+  }
 });
 
 socket.on('tilesUpdated', (data) => {
